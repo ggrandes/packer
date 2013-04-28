@@ -80,4 +80,4 @@ Add the Packer dependency to your pom.xml:
 
 
 ---
-Inspired in [Kryo](http://code.google.com/p/kryo/), this code is Java-minimalistic version.
+Inspired in [Kryo](http://code.google.com/p/kryo/) and [Perl-Pack](http://perldoc.perl.org/functions/pack.html), this code is Java-minimalistic version.
