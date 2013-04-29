@@ -17,12 +17,9 @@ package org.packer;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.ParseException;
-import java.util.Arrays;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
-
-import javax.xml.bind.DatatypeConverter;
 
 /**
  * Simple Data Packer
@@ -350,7 +347,7 @@ public class Packer {
 	 * @see #loadStringBase64(String)
 	 */
 	public String outputStringBase64() {
-		return DatatypeConverter.printBase64Binary(outputBytes());
+		return new String(Base64.encode(outputBytes(), false), charsetISOLatin1);
 	}
 
 	/**
@@ -363,23 +360,7 @@ public class Packer {
 	 * @see #loadStringBase64URLSafe(String)
 	 */
 	public String outputStringBase64URLSafe() {
-		char[] tmpBuf = outputStringBase64().toCharArray();
-		int len = 0;
-		END: for (int i = 0; i < tmpBuf.length; i++) {
-			final char c = tmpBuf[i];
-			switch (c) {
-			case '+':
-				tmpBuf[i] = '-';
-				break;
-			case '/':
-				tmpBuf[i] = '_';
-				break;
-			case '=':
-				break END;
-			}
-			len++;
-		}
-		return new String(tmpBuf, 0, len);
+		return new String(Base64.encode(outputBytes(), true), charsetISOLatin1);
 	}
 
 	/**
@@ -600,7 +581,7 @@ public class Packer {
 	 * @see #outputStringBase64()
 	 */
 	public Packer loadStringBase64(final String in) {
-		final byte[] tmpBuf = DatatypeConverter.parseBase64Binary(in);
+		final byte[] tmpBuf = Base64.decode(in.getBytes(charsetISOLatin1));
 		return loadBytes(tmpBuf);
 	}
 
@@ -613,27 +594,8 @@ public class Packer {
 	 * @see Packer#outputStringBase64URLSafe()
 	 */
 	public Packer loadStringBase64URLSafe(final String in) {
-		final int inlen = in.length();
-		final int pad = (((inlen % 4) > 0) ? (4 - (inlen % 4)) : 0);
-		final int outlen = inlen + pad;
-		final char[] charBuf = new char[outlen];
-		Arrays.fill(charBuf, inlen, charBuf.length, '=');
-		for (int i = 0; i < inlen; i++) {
-			final char c = in.charAt(i);
-			switch (c) {
-			case '-':
-				charBuf[i] = '+';
-				break;
-			case '_':
-				charBuf[i] = '/';
-				break;
-			default:
-				charBuf[i] = c;
-				break;
-			}
-		}
-		final String tmpStr = new String(charBuf, 0, outlen);
-		return loadStringBase64(tmpStr);
+		final byte[] tmpBuf = Base64.decode(in.getBytes(charsetISOLatin1));
+		return loadBytes(tmpBuf);
 	}
 
 	/**
