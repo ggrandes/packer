@@ -1,4 +1,3 @@
-package org.packer;
 /*
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,6 +12,8 @@ package org.packer;
  * limitations under the License.
  *
  */
+package org.packer;
+
 import java.nio.charset.Charset;
 
 //import javax.xml.bind.DatatypeConverter;
