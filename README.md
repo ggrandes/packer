@@ -2,7 +2,7 @@
 
 Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Java project under Apache License v2.0
 
-### Current Development Version is [0.0.1](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.1/figaro-0.0.1.jar)
+### Current Development Version is [0.0.2](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.2/figaro-0.0.2.jar)
 
 ---
 
@@ -14,7 +14,6 @@ Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Jav
 import org.packer.Packer;
 
 public class Example {
-
 	public static void main(final String[] args) {
 		// Sample usage (output):
 		Packer p = new Packer();
@@ -45,7 +44,6 @@ public class Example {
 		System.out.println(p.getVLong());
 		System.out.println(p.getVNegInt());
 	}
-
 }
 ```
 
@@ -69,7 +67,7 @@ Add the Packer dependency to your pom.xml:
     <dependency>
         <groupId>org.packer</groupId>
         <artifactId>packer</artifactId>
-        <version>0.0.1</version>
+        <version>0.0.2</version>
     </dependency>
 
 ---
