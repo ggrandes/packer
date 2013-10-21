@@ -17,6 +17,9 @@ package org.packer;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.text.ParseException;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
@@ -30,12 +33,12 @@ import java.util.zip.Inflater;
  * Packer p = new Packer();
  * p.useCompress(false);
  * p.useCRC(false);
- * String s = "hello world";
+ * String s1 = "hello", s2 = "world";
  * String hs = "df0c290eae2b";
  * byte b = 42;
  * long l = 0x648C9A7109B4L;
  * int ni = -192813;
- * p.putString(s);
+ * p.putString(s1).putString(s2);
  * p.putHexString(hs);
  * p.putByte(b);
  * p.putVLong(l);
@@ -53,6 +56,7 @@ import java.util.zip.Inflater;
  * p.useCRC(false);
  * p.loadStringBase64URLSafe(input);
  * System.out.println(p.getString());
+ * System.out.println(p.getString());
  * System.out.println(p.getHexStringUpper());
  * System.out.println(p.getByte());
  * System.out.println(p.getVLong());
@@ -67,8 +71,7 @@ public class Packer {
 
 	static final Charset charsetUTF8 = Charset.forName("UTF-8");
 	static final Charset charsetISOLatin1 = Charset.forName("ISO-8859-1");
-	static final Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION,
-			true);
+	static final Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION, true);
 	static final Inflater inflater = new Inflater(true);
 
 	final ByteBuffer buf;
@@ -242,8 +245,7 @@ public class Packer {
 	}
 
 	/**
-	 * Put native int in variable length format (support negative value, but
-	 * size is longer)
+	 * Put native int in variable length format (support negative value, but size is longer)
 	 * 
 	 * @param value
 	 * @return
@@ -255,8 +257,7 @@ public class Packer {
 	}
 
 	/**
-	 * Put native negative int in variable length format (support positive
-	 * value, but size is longer)
+	 * Put native negative int in variable length format (support positive value, but size is longer)
 	 * 
 	 * @param value
 	 * @return
@@ -268,8 +269,7 @@ public class Packer {
 	}
 
 	/**
-	 * Put native long in variable length format (support negative value, but
-	 * size is longer)
+	 * Put native long in variable length format (support negative value, but size is longer)
 	 * 
 	 * @param value
 	 * @return
@@ -281,8 +281,7 @@ public class Packer {
 	}
 
 	/**
-	 * Put native negative long in variable length format (support positive
-	 * value, but size is longer)
+	 * Put native negative long in variable length format (support positive value, but size is longer)
 	 * 
 	 * @param value
 	 * @return
@@ -337,6 +336,39 @@ public class Packer {
 		return this;
 	}
 
+	/**
+	 * Put a Collection<String> in UTF-8 format
+	 * 
+	 * @param collection
+	 * @return
+	 * @see #getStringCollection(Collection)
+	 */
+	public Packer putStringCollection(final Collection<String> collection) {
+		encodeVInt(buf, collection.size());
+		for (final String value : collection) {
+			encodeString(buf, value);
+		}
+		return this;
+	}
+
+	/**
+	 * Put a Map<String, String> in UTF-8 format
+	 * 
+	 * @param value
+	 * @return
+	 * @see #getStringMap(Map)
+	 */
+	public Packer putStringMap(final Map<String, String> map) {
+		encodeVInt(buf, map.size());
+		for (final Entry<String, String> e : map.entrySet()) {
+			final String key = e.getKey();
+			final String value = e.getValue();
+			encodeString(buf, key);
+			encodeString(buf, value);
+		}
+		return this;
+	}
+
 	// ------------- OUTPUT -------------
 
 	/**
@@ -351,8 +383,7 @@ public class Packer {
 	}
 
 	/**
-	 * Output Base64 string replacing "+/" to "-_" that is URL safe and removing
-	 * base64 padding "="
+	 * Output Base64 string replacing "+/" to "-_" that is URL safe and removing base64 padding "="
 	 * <p>
 	 * RFC-4648 info, The "URL and Filename safe" Base 64 Alphabet: <a
 	 * href="http://tools.ietf.org/html/rfc4648#page-7">RFC-4648</a>
@@ -477,8 +508,7 @@ public class Packer {
 	}
 
 	/**
-	 * Get native int stored in variable length format (support positive value,
-	 * but size is longer)
+	 * Get native int stored in variable length format (support positive value, but size is longer)
 	 * 
 	 * @return
 	 * @see #getVNegInt()
@@ -488,8 +518,7 @@ public class Packer {
 	}
 
 	/**
-	 * Get native negative int stored in variable length format (support
-	 * positive value, but size is longer)
+	 * Get native negative int stored in variable length format (support positive value, but size is longer)
 	 * 
 	 * @return
 	 * @see #getVInt()
@@ -499,8 +528,7 @@ public class Packer {
 	}
 
 	/**
-	 * Get native long stored in variable length format (support positive value,
-	 * but size is longer)
+	 * Get native long stored in variable length format (support positive value, but size is longer)
 	 * 
 	 * @return
 	 * @see #getVNegLong()
@@ -510,8 +538,7 @@ public class Packer {
 	}
 
 	/**
-	 * Get native negative long stored in variable length format (support
-	 * positive value, but size is longer)
+	 * Get native negative long stored in variable length format (support positive value, but size is longer)
 	 * 
 	 * @return
 	 * @see #getVLong()
@@ -555,6 +582,86 @@ public class Packer {
 		byte[] hex = new byte[len];
 		buf.get(hex);
 		return toHex(hex, true);
+	}
+
+	/**
+	 * Get Collection<String> stored in UTF-8 format
+	 * 
+	 * @param collection
+	 *            to put stored elements
+	 * @return
+	 * @see #putStringCollection(Collection)
+	 */
+	public Collection<String> getStringCollection(final Collection<String> collection) {
+		final int len = decodeVInt(buf);
+		for (int i = 0; i < len; i++) {
+			collection.add(decodeString(buf));
+		}
+		return collection;
+	}
+
+	/**
+	 * Get Collection<String> stored in UTF-8 format
+	 * 
+	 * @param clazz
+	 *            to instantiate
+	 * @return
+	 * @see #putStringCollection(Collection)
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public Collection<String> getStringCollection(final Class<? extends Collection> clazz) {
+		try {
+			final Collection<String> collection = clazz.newInstance();
+			final int len = decodeVInt(buf);
+			for (int i = 0; i < len; i++) {
+				collection.add(decodeString(buf));
+			}
+			return collection;
+		} catch (InstantiationException e) {
+			throw new RuntimeException(e);
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		}
+	}
+
+	/**
+	 * Get Map<String, String> stored in UTF-8 format
+	 * 
+	 * @param map
+	 *            to put stored elements
+	 * @return
+	 * @see #putStringMap(Map)
+	 */
+	public Map<String, String> getStringMap(final Map<String, String> map) {
+		final int len = decodeVInt(buf);
+		for (int i = 0; i < len; i++) {
+			map.put(decodeString(buf), decodeString(buf));
+		}
+		return map;
+	}
+
+	/**
+	 * Get Map<String, String> stored in UTF-8 format
+	 * 
+	 * @param clazz
+	 *            to instantiate
+	 * @return
+	 * @see #putStringMap(Map)
+	 */
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public Map<String, String> getStringMap(final Class<? extends Map> clazz) {
+		try {
+			final Map<String, String> map = clazz.newInstance();
+			final int len = decodeVInt(buf);
+			for (int i = 0; i < len; i++) {
+				map.put(decodeString(buf), decodeString(buf));
+			}
+			return map;
+		} catch (InstantiationException e) {
+			throw new RuntimeException(e);
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	/**
@@ -697,8 +804,7 @@ public class Packer {
 	 * @param input
 	 * @return
 	 */
-	static final String toHex(final byte[] input, final int len,
-			final boolean upper) {
+	static final String toHex(final byte[] input, final int len, final boolean upper) {
 		final char[] hex = new char[len << 1];
 		for (int i = 0, j = 0; i < len; i++) {
 			final int bx = input[i];

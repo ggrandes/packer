@@ -2,7 +2,7 @@
 
 Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Java project under Apache License v2.0
 
-### Current Development Version is [0.0.2](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.2/figaro-0.0.2.jar)
+### Current Development Version is [0.0.3](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.3/packer-0.0.3.jar)
 
 ---
 
@@ -19,12 +19,12 @@ public class Example {
 		Packer p = new Packer();
 		p.useCompress(false);
 		p.useCRC(false);
-		String s = "hello world";
+		String s1 = "hello", s2 = "world";
 		String hs = "df0c290eae2b";
 		byte b = 42;
 		long l = 0x648C9A7109B4L;
 		int ni = -192813;
-		p.putString(s);
+		p.putString(s1).putString(s2);
 		p.putHexString(hs);
 		p.putByte(b);
 		p.putVLong(l);
@@ -38,6 +38,7 @@ public class Example {
 		p.useCompress(false);
 		p.useCRC(false);
 		p.loadStringBase64URLSafe(out);
+		System.out.println(p.getString());
 		System.out.println(p.getString());
 		System.out.println(p.getHexStringUpper());
 		System.out.println(p.getByte());
@@ -67,7 +68,7 @@ Add the Packer dependency to your pom.xml:
     <dependency>
         <groupId>org.packer</groupId>
         <artifactId>packer</artifactId>
-        <version>0.0.2</version>
+        <version>0.0.3</version>
     </dependency>
 
 ---
