@@ -412,10 +412,11 @@ public class Packer {
 	 * 
 	 * @param value
 	 * @return
+	 * @throws IllegalArgumentException
 	 * @see #getHexStringLower()
 	 * @see #getHexStringUpper()
 	 */
-	public Packer putHexString(final String value) {
+	public Packer putHexString(final String value) throws IllegalArgumentException {
 		try {
 			byte[] hex = fromHex(value);
 			encodeVInt(buf, hex.length);
@@ -508,6 +509,8 @@ public class Packer {
 	 * Output bytes in raw format
 	 * 
 	 * @return
+	 * @throws IllegalArgumentException
+	 * 
 	 * @see #loadBytes(byte[])
 	 * @see #useCompress(boolean)
 	 * @see #useCRC(boolean)
@@ -527,7 +530,7 @@ public class Packer {
 			try {
 				tmpBuf = crypto(tmpBuf, 0, len, false);
 			} catch (Exception e) {
-				throw new RuntimeException(e);
+				throw new IllegalArgumentException("Encryption failed", e);
 			}
 			len = tmpBuf.length;
 		}
@@ -739,9 +742,9 @@ public class Packer {
 			}
 			return collection;
 		} catch (InstantiationException e) {
-			throw new RuntimeException(e);
+			throw new IllegalArgumentException("Invalid class", e);
 		} catch (IllegalAccessException e) {
-			throw new RuntimeException(e);
+			throw new IllegalArgumentException("Invalid class", e);
 		}
 	}
 
@@ -779,9 +782,9 @@ public class Packer {
 			}
 			return map;
 		} catch (InstantiationException e) {
-			throw new RuntimeException(e);
+			throw new IllegalArgumentException("Invalid class", e);
 		} catch (IllegalAccessException e) {
-			throw new RuntimeException(e);
+			throw new IllegalArgumentException("Invalid class", e);
 		}
 	}
 
@@ -806,9 +809,11 @@ public class Packer {
 	 * <p>
 	 * Base64 info: <a href="http://en.wikipedia.org/wiki/Base64">Base64</a>
 	 * 
+	 * @throws InvalidInputDataException
+	 * 
 	 * @see #outputStringBase64()
 	 */
-	public Packer loadStringBase64(final String in) {
+	public Packer loadStringBase64(final String in) throws InvalidInputDataException {
 		final byte[] tmpBuf = Base64.decode(in.getBytes(charsetISOLatin1));
 		return loadBytes(tmpBuf);
 	}
@@ -819,9 +824,11 @@ public class Packer {
 	 * RFC-4648 info, The "URL and Filename safe" Base 64 Alphabet: <a
 	 * href="http://tools.ietf.org/html/rfc4648#page-7">RFC-4648</a>
 	 * 
+	 * @throws InvalidInputDataException
+	 * 
 	 * @see Packer#outputStringBase64URLSafe()
 	 */
-	public Packer loadStringBase64URLSafe(final String in) {
+	public Packer loadStringBase64URLSafe(final String in) throws InvalidInputDataException {
 		final byte[] tmpBuf = Base64.decode(in.getBytes(charsetISOLatin1));
 		return loadBytes(tmpBuf);
 	}
@@ -830,10 +837,11 @@ public class Packer {
 	 * Load string in hex format
 	 * 
 	 * @return
+	 * @throws InvalidInputDataException
 	 * @throws ParseException
 	 * @see #outputStringHex()
 	 */
-	public Packer loadStringHex(final String in) {
+	public Packer loadStringHex(final String in) throws InvalidInputDataException {
 		try {
 			byte[] tmpBuf = fromHex(in);
 			return loadBytes(tmpBuf);
@@ -846,9 +854,10 @@ public class Packer {
 	 * Load string in raw format (ISO-8859-1)
 	 * 
 	 * @return
+	 * @throws InvalidInputDataException
 	 * @see #outputStringRAW()
 	 */
-	public Packer loadStringRAW(final String in) {
+	public Packer loadStringRAW(final String in) throws InvalidInputDataException {
 		final byte[] tmpBuf = in.getBytes(charsetISOLatin1);
 		return loadBytes(tmpBuf);
 	}
@@ -857,57 +866,58 @@ public class Packer {
 	 * Load bytes[] in raw format (ISO-8859-1)
 	 * 
 	 * @return
+	 * @throws InvalidInputDataException
 	 * @see #outputBytes()
 	 */
-	public Packer loadBytes(byte[] in) {
+	public Packer loadBytes(byte[] in) throws InvalidInputDataException {
 		int inlen = in.length;
 		int flags = (int) in[--inlen];
 		if (checkFlag(flags, FLAG_HMAC)) {
 			if (hMac == null)
-				throw new IllegalArgumentException("Invalid Flags (HMAC)");
+				throw new InvalidInputDataException("Invalid Flags (HMAC)");
 			final int hmacLen = hMac.getMacLength();
 			byte[] mdBuf = hmac(in, 0, inlen - hmacLen);
 			boolean hmacOK = compareBuffer(in, inlen - hmacLen, mdBuf, 0, hmacLen);
 			if (!hmacOK)
-				throw new IllegalArgumentException("Invalid HMAC");
+				throw new InvalidInputDataException("Invalid HMAC");
 			inlen -= hmacLen;
 		}
 		if (checkFlag(flags, FLAG_HASH)) {
 			if (mdHash == null)
-				throw new IllegalArgumentException("Invalid Flags (HASH)");
+				throw new InvalidInputDataException("Invalid Flags (HASH)");
 			final int mdLen = mdHash.getDigestLength();
 			byte[] mdBuf = hash(in, 0, inlen - mdLen);
 			boolean hashOK = compareBuffer(in, inlen - mdLen, mdBuf, 0, mdLen);
 			if (!hashOK)
-				throw new IllegalArgumentException("Invalid HASH");
+				throw new InvalidInputDataException("Invalid HASH");
 			inlen -= mdLen;
 		}
 		if (checkFlag(flags, FLAG_CRC)) {
 			if (!useCRC)
-				throw new IllegalArgumentException("Invalid Flags (CRC)");
+				throw new InvalidInputDataException("Invalid Flags (CRC)");
 			int crc = crc8(in, 0, inlen - 1);
 			boolean crcOK = (crc == in[inlen - 1]);
 			if (!crcOK)
-				throw new IllegalArgumentException("Invalid CRC");
+				throw new InvalidInputDataException("Invalid CRC");
 			inlen -= 1;
 		}
 		if (checkFlag(flags, FLAG_AES)) {
 			if (aesKey == null)
-				throw new IllegalArgumentException("Invalid Flags (Crypto)");
+				throw new InvalidInputDataException("Invalid Flags (Crypto)");
 			try {
 				in = crypto(in, 0, inlen, true);
 			} catch (Exception e) {
-				throw new IllegalArgumentException("Invalid Crypto data", e);
+				throw new InvalidInputDataException("Invalid Crypto data", e);
 			}
 			inlen = in.length;
 		}
 		if (checkFlag(flags, FLAG_COMPRESS)) {
 			if (!useCompress)
-				throw new IllegalArgumentException("Invalid Flags (Compressed)");
+				throw new InvalidInputDataException("Invalid Flags (Compressed)");
 			try {
 				in = inflate(in, 0, inlen);
 			} catch (DataFormatException e) {
-				throw new IllegalArgumentException("Invalid Compressed data", e);
+				throw new InvalidInputDataException("Invalid Compressed data", e);
 			}
 			inlen = in.length;
 		}
@@ -1239,5 +1249,24 @@ public class Packer {
 			payloadLength = inflater.inflate(infBuf);
 		}
 		return resizeBuffer(infBuf, payloadLength);
+	}
+
+	/**
+	 * Input data is invalid
+	 */
+	public static class InvalidInputDataException extends Exception {
+		private static final long serialVersionUID = 42L;
+
+		public InvalidInputDataException(final String text) {
+			super(text);
+		}
+
+		public InvalidInputDataException(final Exception e) {
+			super(e);
+		}
+
+		public InvalidInputDataException(final String text, final Exception e) {
+			super(text, e);
+		}
 	}
 }
