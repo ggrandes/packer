@@ -48,7 +48,7 @@ public class Example {
 		p.useAES("secret"); 				// Enable Encryption (AES)
 		p.useCRC(true); 					// Enable CRC
 		p.useHASH("SHA-256"); 				// Enable HASH (SHA-256)
-		p.useHMAC("HmacSHA256", "secret"); 	// Enable HMAC (SHA-256)
+		p.useHMAC("HmacSHA256", "secret"); 	// Enable Hash-MAC (SHA-256)
 		p.loadStringBase64URLSafe(out);
 		Collection<String> sc2 = new ArrayList<String>();
 		System.out.println(s1 + "\t" + p.getString());
