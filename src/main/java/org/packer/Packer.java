@@ -16,6 +16,11 @@ package org.packer;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.text.ParseException;
 import java.util.Collection;
 import java.util.Map;
@@ -23,6 +28,14 @@ import java.util.Map.Entry;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
+
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.Mac;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 /**
  * Simple Data Packer
@@ -69,10 +82,27 @@ import java.util.zip.Inflater;
 public class Packer {
 	public static final int DEFAULT_SIZE = 4096;
 
+	public static final int FLAG_COMPRESS = 0x01;
+	public static final int FLAG_AES = 0x02;
+	public static final int FLAG_CRC = 0x04;
+	public static final int FLAG_HASH = 0x08;
+	public static final int FLAG_HMAC = 0x10;
+
 	static final Charset charsetUTF8 = Charset.forName("UTF-8");
 	static final Charset charsetISOLatin1 = Charset.forName("ISO-8859-1");
 	static final Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION, true);
 	static final Inflater inflater = new Inflater(true);
+	static final SecureRandom rnd = new SecureRandom();
+	// HASH
+	MessageDigest mdHash = null;
+	// HMAC
+	Mac hMac = null;
+	// AES
+	byte[] fakeIV = "fKnuy=eimE-Lid2Th$s/3pJS$#vzk4:86UBU:WX$X7GjyB-yrv!+IsJ-nSCGF63SR_9tjt.w9ngxS.WmkVzGY2QycbUWNILc8ZyZguaNE2=D6htKMsmP2EKb9BHsJW4B"
+			.getBytes(charsetISOLatin1);
+	IvParameterSpec aesIV = null;
+	Cipher aesCipher = null;
+	SecretKeySpec aesKey = null;
 
 	final ByteBuffer buf;
 	boolean useCompress = false;
@@ -146,6 +176,66 @@ public class Packer {
 	 */
 	public Packer useCRC(final boolean useCRC) {
 		this.useCRC = useCRC;
+		return this;
+	}
+
+	/**
+	 * Sets the usage of HASH for sanity
+	 * 
+	 * @param hashAlg
+	 *            hash algogithm
+	 * @return
+	 * @throws NoSuchAlgorithmException
+	 * 
+	 * @see {@link java.security.MessageDigest#getInstance(String)}
+	 */
+	public Packer useHASH(final String hashAlg) throws NoSuchAlgorithmException {
+		mdHash = MessageDigest.getInstance(hashAlg);
+		return this;
+	}
+
+	/**
+	 * Sets the usage of Hash-MAC for authentication
+	 * 
+	 * @param hMacAlg
+	 *            HMAC algorithm (HmacSHA1, HmacSHA256,...)
+	 * @param passphrase
+	 *            shared secret
+	 * @return
+	 * 
+	 * @throws NoSuchAlgorithmException
+	 * @throws InvalidKeyException
+	 * 
+	 * @see {@link javax.crypto.Mac#getInstance(String)}
+	 * @see <a
+	 *      href="http://docs.oracle.com/javase/6/docs/technotes/guides/security/SunProviders.html#SunJCEProvider">JCE
+	 *      Provider</a>
+	 */
+	public Packer useHMAC(final String hMacAlg, final String passphrase) throws NoSuchAlgorithmException,
+			InvalidKeyException {
+		hMac = Mac.getInstance(hMacAlg); // "HmacSHA256"
+		hMac.init(new SecretKeySpec(passphrase.getBytes(charsetUTF8), hMacAlg));
+		return this;
+	}
+
+	/**
+	 * Sets he usage of AES for encryption
+	 * 
+	 * @param passphrase
+	 *            shared secret
+	 * @return
+	 * @throws NoSuchAlgorithmException
+	 * @throws NoSuchPaddingException
+	 */
+	public Packer useAES(final String passphrase) throws NoSuchAlgorithmException, NoSuchPaddingException {
+		aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+		aesIV = new IvParameterSpec(resizeBuffer(fakeIV, aesCipher.getBlockSize())); // rnd.generateSeed(aesCipher.getBlockSize())
+		byte[] pwd = passphrase.getBytes(charsetUTF8);
+		MessageDigest md = MessageDigest.getInstance("SHA-512");
+		md.update(pwd, 0, pwd.length);
+		pwd = md.digest();
+		pwd = resizeBuffer(pwd, aesCipher.getBlockSize());
+		aesKey = new SecretKeySpec(pwd, "AES");
 		return this;
 	}
 
@@ -419,20 +509,51 @@ public class Packer {
 	 * 
 	 * @return
 	 * @see #loadBytes(byte[])
+	 * @see #useCompress(boolean)
+	 * @see #useCRC(boolean)
+	 * @see #useHASH(String)
 	 */
 	public byte[] outputBytes() {
 		byte[] tmpBuf = buf.array();
 		int len = buf.limit();
+		int flags = 0;
 		if (useCompress) {
+			flags |= FLAG_COMPRESS;
 			tmpBuf = deflate(tmpBuf, len);
 			len = tmpBuf.length;
 		}
+		if (aesKey != null) {
+			flags |= FLAG_AES;
+			try {
+				tmpBuf = crypto(tmpBuf, 0, len, false);
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+			len = tmpBuf.length;
+		}
 		if (useCRC) {
+			flags |= FLAG_CRC;
 			tmpBuf = resizeBuffer(tmpBuf, len + 1);
 			tmpBuf[len] = (byte) crc8(tmpBuf, 0, len);
 			len = tmpBuf.length;
 		}
-		return resizeBuffer(tmpBuf, len);
+		if (mdHash != null) { // useHASH
+			flags |= FLAG_HASH;
+			byte[] mdBuf = hash(tmpBuf, 0, len);
+			tmpBuf = resizeBuffer(tmpBuf, len + mdBuf.length);
+			System.arraycopy(mdBuf, 0, tmpBuf, len, mdBuf.length);
+			len = tmpBuf.length;
+		}
+		if (hMac != null) { // useHMAC
+			flags |= FLAG_HMAC;
+			byte[] hmacBuf = hmac(tmpBuf, 0, len);
+			tmpBuf = resizeBuffer(tmpBuf, len + hmacBuf.length);
+			System.arraycopy(hmacBuf, 0, tmpBuf, len, hmacBuf.length);
+			len = tmpBuf.length;
+		}
+		tmpBuf = resizeBuffer(tmpBuf, ++len);
+		tmpBuf[len - 1] = (byte) (flags & 0xFF);
+		return tmpBuf;
 	}
 
 	// ------------- GET -------------
@@ -738,16 +859,60 @@ public class Packer {
 	 * @return
 	 * @see #outputBytes()
 	 */
-	public Packer loadBytes(final byte[] in) {
-		if (useCRC) {
-			int crc = crc8(in, 0, in.length - 1);
-			boolean crcOK = (crc == in[in.length - 1]);
-			if (!crcOK) {
+	public Packer loadBytes(byte[] in) {
+		int inlen = in.length;
+		int flags = (int) in[--inlen];
+		if (checkFlag(flags, FLAG_HMAC)) {
+			if (hMac == null)
+				throw new IllegalArgumentException("Invalid Flags (HMAC)");
+			final int hmacLen = hMac.getMacLength();
+			byte[] mdBuf = hmac(in, 0, inlen - hmacLen);
+			boolean hmacOK = compareBuffer(in, inlen - hmacLen, mdBuf, 0, hmacLen);
+			if (!hmacOK)
+				throw new IllegalArgumentException("Invalid HMAC");
+			inlen -= hmacLen;
+		}
+		if (checkFlag(flags, FLAG_HASH)) {
+			if (mdHash == null)
+				throw new IllegalArgumentException("Invalid Flags (HASH)");
+			final int mdLen = mdHash.getDigestLength();
+			byte[] mdBuf = hash(in, 0, inlen - mdLen);
+			boolean hashOK = compareBuffer(in, inlen - mdLen, mdBuf, 0, mdLen);
+			if (!hashOK)
+				throw new IllegalArgumentException("Invalid HASH");
+			inlen -= mdLen;
+		}
+		if (checkFlag(flags, FLAG_CRC)) {
+			if (!useCRC)
+				throw new IllegalArgumentException("Invalid Flags (CRC)");
+			int crc = crc8(in, 0, inlen - 1);
+			boolean crcOK = (crc == in[inlen - 1]);
+			if (!crcOK)
 				throw new IllegalArgumentException("Invalid CRC");
+			inlen -= 1;
+		}
+		if (checkFlag(flags, FLAG_AES)) {
+			if (aesKey == null)
+				throw new IllegalArgumentException("Invalid Flags (Crypto)");
+			try {
+				in = crypto(in, 0, inlen, true);
+			} catch (Exception e) {
+				throw new IllegalArgumentException("Invalid Crypto data", e);
 			}
+			inlen = in.length;
+		}
+		if (checkFlag(flags, FLAG_COMPRESS)) {
+			if (!useCompress)
+				throw new IllegalArgumentException("Invalid Flags (Compressed)");
+			try {
+				in = inflate(in, 0, inlen);
+			} catch (DataFormatException e) {
+				throw new IllegalArgumentException("Invalid Compressed data", e);
+			}
+			inlen = in.length;
 		}
 		buf.clear();
-		buf.put(useCompress ? inflate(in) : in);
+		buf.put(in, 0, inlen);
 		buf.flip();
 		buf.rewind();
 		return this;
@@ -784,6 +949,56 @@ public class Packer {
 	}
 
 	/**
+	 * Calculate HASH of input
+	 * <p>
+	 * <a href="http://en.wikipedia.org/wiki/SHA-1">SHA-1</a>
+	 * 
+	 * @param input
+	 * @param offset
+	 * @param len
+	 * @return
+	 */
+	final byte[] hash(final byte[] input, final int offset, final int len) {
+		mdHash.update(input, offset, len);
+		return mdHash.digest();
+	}
+
+	/**
+	 * Calculate HMAC of input
+	 * <p>
+	 * <a href="http://en.wikipedia.org/wiki/HMAC">HMAC</a>
+	 * 
+	 * @param input
+	 * @param offset
+	 * @param len
+	 * @return
+	 */
+	final byte[] hmac(final byte[] input, final int offset, final int len) {
+		hMac.update(input, offset, len);
+		return hMac.doFinal();
+	}
+
+	/**
+	 * Encrypt or Decrypt with AES
+	 * 
+	 * @param input
+	 * @param offset
+	 * @param len
+	 * @param decrypt
+	 * @return
+	 * @throws InvalidAlgorithmParameterException
+	 * @throws InvalidKeyException
+	 * @throws BadPaddingException
+	 * @throws IllegalBlockSizeException
+	 */
+	final byte[] crypto(final byte[] input, final int offset, final int len, final boolean decrypt)
+			throws InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException,
+			BadPaddingException {
+		aesCipher.init(decrypt ? Cipher.DECRYPT_MODE : Cipher.ENCRYPT_MODE, aesKey, aesIV);
+		return aesCipher.doFinal(input, offset, len);
+	}
+
+	/**
 	 * Resize input buffer to newsize
 	 * 
 	 * @param buf
@@ -796,6 +1011,39 @@ public class Packer {
 		final byte[] newbuf = new byte[newsize];
 		System.arraycopy(buf, 0, newbuf, 0, Math.min(buf.length, newbuf.length));
 		return newbuf;
+	}
+
+	/**
+	 * Compare buffer1 and buffer2
+	 * 
+	 * @param buf1
+	 * @param offset1
+	 * @param buf2
+	 * @param offset2
+	 * @param len
+	 * @return true if all bytes are equal
+	 */
+	static final boolean compareBuffer(final byte[] buf1, final int offset1, final byte[] buf2,
+			final int offset2, final int len) {
+		for (int i = 0; i < len; i++) {
+			final byte b1 = buf1[offset1 + i];
+			final byte b2 = buf2[offset2 + i];
+			if (b1 != b2) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Check for a flag
+	 * 
+	 * @param flags
+	 * @param flag
+	 * @return
+	 */
+	static final boolean checkFlag(final int flags, final int flag) {
+		return ((flags & flag) != 0);
 	}
 
 	/**
@@ -979,19 +1227,17 @@ public class Packer {
 	 * 
 	 * @param in
 	 * @return
+	 * @throws DataFormatException
 	 */
-	static final byte[] inflate(final byte[] in) {
-		try {
-			byte[] infBuf = new byte[in.length << 1];
-			int payloadLength;
-			synchronized (inflater) {
-				inflater.reset();
-				inflater.setInput(in);
-				payloadLength = inflater.inflate(infBuf);
-			}
-			return resizeBuffer(infBuf, payloadLength);
-		} catch (DataFormatException e) {
-			throw new IllegalArgumentException("Compressed data", e);
+	static final byte[] inflate(final byte[] in, final int offset, final int length)
+			throws DataFormatException {
+		byte[] infBuf = new byte[length << 1];
+		int payloadLength;
+		synchronized (inflater) {
+			inflater.reset();
+			inflater.setInput(in, offset, length);
+			payloadLength = inflater.inflate(infBuf);
 		}
+		return resizeBuffer(infBuf, payloadLength);
 	}
 }
