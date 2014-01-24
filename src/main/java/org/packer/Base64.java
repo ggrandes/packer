@@ -27,7 +27,7 @@ public class Base64 {
 	private static final int BITS_PER_B64_BYTE = 6;
 	private static final int BYTES_PER_BLOCK_OF_8_BITS = 3;
 	private static final int BYTES_PER_BLOCK_OF_6_BITS = 4;
-	
+
 	static final Charset charsetUTF8 = Charset.forName("UTF-8");
 	static final Charset charsetISOLatin1 = Charset.forName("ISO-8859-1");
 
@@ -86,7 +86,10 @@ public class Base64 {
 	}
 
 	private static final int paddingOut(final int len, final int pad) {
-		return -((len % pad) - pad);
+		final int r = (len % pad);
+		if (r == 0)
+			return 0;
+		return -(r - pad);
 	}
 
 	/**
@@ -182,6 +185,7 @@ public class Base64 {
 	public static void main(final String[] args) throws Throwable {
 		final String strTest1 = "test";
 		final String strTest2 = "hello world!!";
+		final String strTest3 = "aaaaaaaaaaaaaaa"; // aaa
 		//
 		if (true) {
 			System.out.println("----------- encode 1 base64 standard");
@@ -189,7 +193,7 @@ public class Base64 {
 			System.out.println(strInput.length() + "\t" + strInput);
 			String encoded = encode(strInput, false);
 			System.out.println(encoded);
-			//System.out.println(DatatypeConverter.printBase64Binary(strInput.getBytes(charsetUTF8)));
+			// System.out.println(DatatypeConverter.printBase64Binary(strInput.getBytes(charsetUTF8)));
 			String decoded = decode(encoded);
 			System.out.println(decoded.length() + "\t" + decoded);
 		}
@@ -209,7 +213,7 @@ public class Base64 {
 			System.out.println(strInput.length() + "\t" + strInput);
 			String encoded = encode(strInput, false);
 			System.out.println(encoded);
-			//System.out.println(DatatypeConverter.printBase64Binary(strInput.getBytes(charsetUTF8)));
+			// System.out.println(DatatypeConverter.printBase64Binary(strInput.getBytes(charsetUTF8)));
 			String decoded = decode(encoded);
 			System.out.println(decoded.length() + "\t" + decoded);
 		}
@@ -218,6 +222,15 @@ public class Base64 {
 			String strInput = strTest2;
 			System.out.println(strInput.length() + "\t" + strInput);
 			String encoded = encode(strInput, true);
+			System.out.println(encoded);
+			String decoded = decode(encoded);
+			System.out.println(decoded.length() + "\t" + decoded);
+		}
+		if (true) {
+			System.out.println("----------- encode 3 base64 standard");
+			String strInput = strTest3;
+			System.out.println(strInput.length() + "\t" + strInput);
+			String encoded = encode(strInput, false);
 			System.out.println(encoded);
 			String decoded = decode(encoded);
 			System.out.println(decoded.length() + "\t" + decoded);
