@@ -10,10 +10,12 @@ import org.packer.Packer;
 public class Example {
 
 	public static void main(final String[] args) throws Exception {
+		System.out.println("--- Sample 1");
 		// Sample usage (output):
 		Packer p = new Packer();
+		p.useFlagFooter(false);
 		p.useCompress(true); 				// Enable Compression
-		p.useAES("secret"); 				// Enable Encryption (AES)
+		p.useAES("secret", true); 			// Enable Encryption (AES)
 		p.useCRC(true); 					// Enable CRC
 		p.useHASH("SHA-256"); 				// Enable HASH (SHA-256)
 		p.useHMAC("HmacSHA256", "secret"); 	// Enable Hash-MAC (SHA-256)
@@ -42,10 +44,12 @@ public class Example {
 		String out = p.outputStringBase64URLSafe();
 		System.out.println("output:\t" + out + "\t" + "len:" + out.length());
 
+		System.out.println("--- Sample 2");
 		// Sample usage (load):
 		p = new Packer();
+		p.useFlagFooter(false);
 		p.useCompress(true); 				// Enable Compression
-		p.useAES("secret"); 				// Enable Encryption (AES)
+		p.useAES("secret", true);			// Enable Encryption (AES)
 		p.useCRC(true); 					// Enable CRC
 		p.useHASH("SHA-256"); 				// Enable HASH (SHA-256)
 		p.useHMAC("HmacSHA256", "secret"); 	// Enable Hash-MAC (SHA-256)

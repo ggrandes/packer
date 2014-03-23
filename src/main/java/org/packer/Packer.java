@@ -87,24 +87,31 @@ public class Packer {
 	public static final int FLAG_CRC = 0x04;
 	public static final int FLAG_HASH = 0x08;
 	public static final int FLAG_HMAC = 0x10;
+	public static final int FLAG_RANDOM_IV = 0x20;
 
+	static final String CIPHER_CHAIN_PADDING = "AES/CBC/PKCS5Padding";
+	static final String CIPHER = "AES";
 	static final Charset charsetUTF8 = Charset.forName("UTF-8");
 	static final Charset charsetISOLatin1 = Charset.forName("ISO-8859-1");
 	static final Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION, true);
 	static final Inflater inflater = new Inflater(true);
 	static final SecureRandom rnd = new SecureRandom();
+
 	// HASH
 	MessageDigest mdHash = null;
 	// HMAC
 	Mac hMac = null;
 	// AES
 	byte[] fakeIV = "fKnuy=eimE-Lid2Th$s/3pJS$#vzk4:86UBU:WX$X7GjyB-yrv!+IsJ-nSCGF63SR_9tjt.w9ngxS.WmkVzGY2QycbUWNILc8ZyZguaNE2=D6htKMsmP2EKb9BHsJW4B"
-			.getBytes(charsetISOLatin1);
+			.getBytes(charsetISOLatin1); // Default shared IV
+	boolean randomIV = false;
 	IvParameterSpec aesIV = null;
 	Cipher aesCipher = null;
+	int aesCipherLen = -1;
 	SecretKeySpec aesKey = null;
 
 	final ByteBuffer buf;
+	boolean useFlagFooter = true;
 	boolean useCompress = false;
 	boolean useCRC = false;
 
@@ -158,7 +165,18 @@ public class Packer {
 	}
 
 	/**
-	 * Sets the usage of Deflater/Inflater
+	 * Sets the usage of Footer Flag (default true)
+	 * 
+	 * @param useFlagFooter
+	 * @return
+	 */
+	public Packer useFlagFooter(final boolean useFlagFooter) {
+		this.useFlagFooter = useFlagFooter;
+		return this;
+	}
+
+	/**
+	 * Sets the usage of Deflater/Inflater (default false)
 	 * 
 	 * @param useCompress
 	 * @return
@@ -169,7 +187,7 @@ public class Packer {
 	}
 
 	/**
-	 * Sets the usage of CRC for sanity
+	 * Sets the usage of CRC for sanity (default false)
 	 * 
 	 * @param useCRC
 	 * @return
@@ -180,7 +198,7 @@ public class Packer {
 	}
 
 	/**
-	 * Sets the usage of HASH for sanity
+	 * Sets the usage of HASH for sanity (default no)
 	 * 
 	 * @param hashAlg
 	 *            hash algogithm
@@ -195,7 +213,7 @@ public class Packer {
 	}
 
 	/**
-	 * Sets the usage of Hash-MAC for authentication
+	 * Sets the usage of Hash-MAC for authentication (default no)
 	 * 
 	 * @param hMacAlg
 	 *            HMAC algorithm (HmacSHA1, HmacSHA256,...)
@@ -219,24 +237,99 @@ public class Packer {
 	}
 
 	/**
-	 * Sets he usage of AES for encryption
+	 * Sets he usage of "AES/CBC/PKCS5Padding" (with default IV) for encryption (default no)
 	 * 
-	 * @param passphrase
-	 *            shared secret
+	 * @param passphrase shared secret
 	 * @return
 	 * @throws NoSuchAlgorithmException
 	 * @throws NoSuchPaddingException
 	 */
 	public Packer useAES(final String passphrase) throws NoSuchAlgorithmException, NoSuchPaddingException {
-		aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-		aesIV = new IvParameterSpec(resizeBuffer(fakeIV, aesCipher.getBlockSize())); // rnd.generateSeed(aesCipher.getBlockSize())
-		byte[] pwd = passphrase.getBytes(charsetUTF8);
-		MessageDigest md = MessageDigest.getInstance("SHA-512");
-		md.update(pwd, 0, pwd.length);
-		pwd = md.digest();
-		pwd = resizeBuffer(pwd, aesCipher.getBlockSize());
-		aesKey = new SecretKeySpec(pwd, "AES");
+		return useAES(passphrase, false);
+	}
+
+	/**
+	 * Sets he usage of "AES/CBC/PKCS5Padding" with pre-shared IV for encryption (default no)
+	 * 
+	 * @param passphrase shared secret
+	 * @param sharedIV shared Initialization Vector
+	 * 
+	 * @return
+	 * @throws NoSuchAlgorithmException
+	 * @throws NoSuchPaddingException
+	 */
+	public Packer useAES(final String passphrase, final String sharedIV) throws NoSuchAlgorithmException,
+			NoSuchPaddingException {
+		initCipher();
+		initCipherIV(generateMdfromString(sharedIV, aesCipherLen), false);
+		initCipherKey(passphrase);
 		return this;
+	}
+
+	/**
+	 * Sets he usage of "AES/CBC/PKCS5Padding" for encryption (default no)
+	 * 
+	 * @param passphrase shared secret
+	 * @param useRandomIV true for use randomIV (more secure, more size) or false for default IV (less secure,
+	 *            less size)
+	 * @return
+	 * @throws NoSuchAlgorithmException
+	 * @throws NoSuchPaddingException
+	 */
+	public Packer useAES(final String passphrase, final boolean useRandomIV) throws NoSuchAlgorithmException,
+			NoSuchPaddingException {
+		initCipher();
+		initCipherIV((useRandomIV ? generateRandomIV(aesCipherLen) : getDefaultIV(aesCipherLen)), useRandomIV);
+		initCipherKey(passphrase);
+		return this;
+	}
+
+	private final void initCipher() throws NoSuchAlgorithmException, NoSuchPaddingException {
+		aesCipher = Cipher.getInstance(CIPHER_CHAIN_PADDING);
+		aesCipherLen = aesCipher.getBlockSize();
+	}
+
+	private final void initCipherIV(final byte[] iv, final boolean isRandomIV) {
+		randomIV = isRandomIV;
+		aesIV = new IvParameterSpec(resizeBuffer(iv, aesCipherLen));
+	}
+
+	private final void initCipherKey(final String passphrase) throws NoSuchAlgorithmException {
+		aesKey = new SecretKeySpec(generateMdfromString(passphrase, aesCipherLen), CIPHER);
+	}
+
+	private final byte[] getDefaultIV(final int outlen) {
+		return resizeBuffer(fakeIV, outlen);
+	}
+
+	private final byte[] generateRandomIV(final int outlen) {
+		return rnd.generateSeed(outlen);
+	}
+
+	private final byte[] generateMdfromString(final String shared, final int outlen)
+			throws NoSuchAlgorithmException {
+		final MessageDigest md = getMessageDigestForLength(outlen);
+		final byte[] buf = shared.getBytes(charsetUTF8);
+		md.update(buf, 0, buf.length);
+		return resizeBuffer(md.digest(), outlen);
+	}
+
+	private final MessageDigest getMessageDigestForLength(final int outlen) throws NoSuchAlgorithmException {
+		String mdAlg = null;
+		if (outlen <= (128 >> 3)) {
+			mdAlg = "MD5";
+		} else if (outlen <= (160 >> 3)) {
+			mdAlg = "SHA-1";
+		} else if (outlen <= (256 >> 3)) {
+			mdAlg = "SHA-256";
+		} else if (outlen <= (384 >> 3)) {
+			mdAlg = "SHA-384";
+		} else if (outlen <= (512 >> 3)) {
+			mdAlg = "SHA-512";
+		} else {
+			throw new NoSuchAlgorithmException();
+		}
+		return MessageDigest.getInstance(mdAlg);
 	}
 
 	/**
@@ -383,7 +476,7 @@ public class Packer {
 	}
 
 	/**
-	 * Put Byte array
+	 * Put Byte array (encoded as: VInt-Length + bytes)
 	 * 
 	 * @param value
 	 * @return
@@ -396,7 +489,20 @@ public class Packer {
 	}
 
 	/**
-	 * Put String in UTF-8 format
+	 * Put Byte array (encoded as: Int32-Length + bytes)
+	 * 
+	 * @param value
+	 * @return
+	 * @see #getBytes()
+	 */
+	public Packer putBytesF(final byte[] value) {
+		buf.putInt(value.length);
+		buf.put(value);
+		return this;
+	}
+
+	/**
+	 * Put String in UTF-8 format (encoded as: VInt-Length + bytes)
 	 * 
 	 * @param value
 	 * @return
@@ -404,6 +510,18 @@ public class Packer {
 	 */
 	public Packer putString(final String value) {
 		encodeString(buf, value);
+		return this;
+	}
+
+	/**
+	 * Put String in UTF-8 format (encoded as: Int32-Length + bytes)
+	 * 
+	 * @param value
+	 * @return
+	 * @see #getString()
+	 */
+	public Packer putStringF(final String value) {
+		encodeStringF(buf, value);
 		return this;
 	}
 
@@ -533,6 +651,14 @@ public class Packer {
 				throw new IllegalArgumentException("Encryption failed", e);
 			}
 			len = tmpBuf.length;
+			//
+			if ((aesIV != null) && randomIV) { // useAES + randomIV
+				flags |= FLAG_RANDOM_IV;
+				final byte[] ivBuf = aesIV.getIV();
+				tmpBuf = resizeBuffer(tmpBuf, len + ivBuf.length);
+				System.arraycopy(ivBuf, 0, tmpBuf, len, ivBuf.length);
+				len = tmpBuf.length;
+			}
 		}
 		if (useCRC) {
 			flags |= FLAG_CRC;
@@ -542,20 +668,22 @@ public class Packer {
 		}
 		if (mdHash != null) { // useHASH
 			flags |= FLAG_HASH;
-			byte[] mdBuf = hash(tmpBuf, 0, len);
+			final byte[] mdBuf = hash(tmpBuf, 0, len);
 			tmpBuf = resizeBuffer(tmpBuf, len + mdBuf.length);
 			System.arraycopy(mdBuf, 0, tmpBuf, len, mdBuf.length);
 			len = tmpBuf.length;
 		}
 		if (hMac != null) { // useHMAC
 			flags |= FLAG_HMAC;
-			byte[] hmacBuf = hmac(tmpBuf, 0, len);
+			final byte[] hmacBuf = hmac(tmpBuf, 0, len);
 			tmpBuf = resizeBuffer(tmpBuf, len + hmacBuf.length);
 			System.arraycopy(hmacBuf, 0, tmpBuf, len, hmacBuf.length);
 			len = tmpBuf.length;
 		}
-		tmpBuf = resizeBuffer(tmpBuf, ++len);
-		tmpBuf[len - 1] = (byte) (flags & 0xFF);
+		if (useFlagFooter) {
+			tmpBuf = resizeBuffer(tmpBuf, ++len);
+			tmpBuf[len - 1] = (byte) (flags & 0xFF);
+		}
 		return tmpBuf;
 	}
 
@@ -672,7 +800,7 @@ public class Packer {
 	}
 
 	/**
-	 * Get Byte array
+	 * Get Byte array (encoded as: VInt-Length + bytes)
 	 * 
 	 * @return
 	 * @see #putBytes(byte[])
@@ -685,13 +813,36 @@ public class Packer {
 	}
 
 	/**
-	 * Get String stored in UTF-8 format
+	 * Get Byte array (encoded as: Int32-Length + bytes)
+	 * 
+	 * @return
+	 * @see #putBytes(byte[])
+	 */
+	public byte[] getBytesF() {
+		int len = buf.getInt();
+		byte[] bytes = new byte[len];
+		buf.get(bytes);
+		return bytes;
+	}
+
+	/**
+	 * Get String stored in UTF-8 format (encoded as: VInt-Length + bytes)
 	 * 
 	 * @return
 	 * @see #putString(String)
 	 */
 	public String getString() {
 		return decodeString(buf);
+	}
+
+	/**
+	 * Get String stored in UTF-8 format (encoded as: Int32-Length + bytes)
+	 * 
+	 * @return
+	 * @see #putString(String)
+	 */
+	public String getStringF() {
+		return decodeStringF(buf);
 	}
 
 	/**
@@ -732,7 +883,9 @@ public class Packer {
 	 * @return
 	 * @see #putStringCollection(Collection)
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@SuppressWarnings({
+			"unchecked", "rawtypes"
+	})
 	public Collection<String> getStringCollection(final Class<? extends Collection> clazz) {
 		try {
 			final Collection<String> collection = clazz.newInstance();
@@ -772,7 +925,9 @@ public class Packer {
 	 * @return
 	 * @see #putStringMap(Map)
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@SuppressWarnings({
+			"unchecked", "rawtypes"
+	})
 	public Map<String, String> getStringMap(final Class<? extends Map> clazz) {
 		try {
 			final Map<String, String> map = clazz.newInstance();
@@ -871,10 +1026,27 @@ public class Packer {
 	 */
 	public Packer loadBytes(byte[] in) throws InvalidInputDataException {
 		int inlen = in.length;
-		int flags = (int) in[--inlen];
+		int flags = 0;
+		if (useFlagFooter) {
+			flags = (int) in[--inlen];
+		} else {
+			if (useCompress)
+				flags |= FLAG_COMPRESS;
+			if (aesKey != null) {
+				flags |= FLAG_AES;
+				if (randomIV) // useAES + randomIV
+					flags |= FLAG_RANDOM_IV;
+			}
+			if (useCRC)
+				flags |= FLAG_CRC;
+			if (mdHash != null)
+				flags |= FLAG_HASH;
+			if (hMac != null)
+				flags |= FLAG_HMAC;
+		}
 		if (checkFlag(flags, FLAG_HMAC)) {
 			if (hMac == null)
-				throw new InvalidInputDataException("Invalid Flags (HMAC)");
+				throw new InvalidInputDataException("Invalid Flags (HMAC) or hmac not initialized");
 			final int hmacLen = hMac.getMacLength();
 			byte[] mdBuf = hmac(in, 0, inlen - hmacLen);
 			boolean hmacOK = compareBuffer(in, inlen - hmacLen, mdBuf, 0, hmacLen);
@@ -884,7 +1056,7 @@ public class Packer {
 		}
 		if (checkFlag(flags, FLAG_HASH)) {
 			if (mdHash == null)
-				throw new InvalidInputDataException("Invalid Flags (HASH)");
+				throw new InvalidInputDataException("Invalid Flags (HASH) or hash not initialized");
 			final int mdLen = mdHash.getDigestLength();
 			byte[] mdBuf = hash(in, 0, inlen - mdLen);
 			boolean hashOK = compareBuffer(in, inlen - mdLen, mdBuf, 0, mdLen);
@@ -895,15 +1067,23 @@ public class Packer {
 		if (checkFlag(flags, FLAG_CRC)) {
 			if (!useCRC)
 				throw new InvalidInputDataException("Invalid Flags (CRC)");
-			int crc = crc8(in, 0, inlen - 1);
-			boolean crcOK = (crc == in[inlen - 1]);
+			final byte crc = (byte) crc8(in, 0, inlen - 1);
+			final byte crc2 = in[inlen - 1];
+			boolean crcOK = (crc == crc2);
 			if (!crcOK)
 				throw new InvalidInputDataException("Invalid CRC");
 			inlen -= 1;
 		}
 		if (checkFlag(flags, FLAG_AES)) {
 			if (aesKey == null)
-				throw new InvalidInputDataException("Invalid Flags (Crypto)");
+				throw new InvalidInputDataException("Invalid Flags (Crypto) or crypto not initialized");
+			if (checkFlag(flags, FLAG_RANDOM_IV)) {
+				final int ivLen = aesCipherLen;
+				final byte[] ivBuf = new byte[ivLen];
+				System.arraycopy(in, inlen - ivLen, ivBuf, 0, ivLen);
+				initCipherIV(ivBuf, true);
+				inlen -= ivLen;
+			}
 			try {
 				in = crypto(in, 0, inlen, true);
 			} catch (Exception e) {
@@ -1125,7 +1305,7 @@ public class Packer {
 	}
 
 	/**
-	 * Write String into buffer in UTF-8 format
+	 * Write String into buffer in UTF-8 format (encoded as: VInt-Length + bytes)
 	 * 
 	 * @param buf
 	 * @param value
@@ -1137,13 +1317,38 @@ public class Packer {
 	}
 
 	/**
-	 * Read String from buffer stored in UTF-8 format
+	 * Write String into buffer in UTF-8 format (encoded as: Int32-Length + bytes)
+	 * 
+	 * @param buf
+	 * @param value
+	 */
+	static final void encodeStringF(final ByteBuffer out, final String value) {
+		final byte[] utf = value.getBytes(charsetUTF8);
+		out.putInt(utf.length);
+		out.put(utf);
+	}
+
+	/**
+	 * Read String from buffer stored in UTF-8 format (encoded as: VInt-Length + bytes)
 	 * 
 	 * @param buf
 	 * @return
 	 */
 	static final String decodeString(final ByteBuffer in) {
 		int len = decodeVInt(in);
+		byte[] utf = new byte[len];
+		in.get(utf);
+		return new String(utf, 0, len, charsetUTF8);
+	}
+
+	/**
+	 * Read String from buffer stored in UTF-8 format (encoded as: Int32-Length + bytes)
+	 * 
+	 * @param buf
+	 * @return
+	 */
+	static final String decodeStringF(final ByteBuffer in) {
+		int len = in.getInt();
 		byte[] utf = new byte[len];
 		in.get(utf);
 		return new String(utf, 0, len, charsetUTF8);

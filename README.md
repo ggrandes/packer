@@ -2,11 +2,34 @@
 
 Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Java project under Apache License v2.0
 
-### Current Development Version is [0.0.6](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.6/packer-0.0.6.jar)
+### Current Development Version is [0.0.7](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.7/packer-0.0.7.jar)
 
 ---
 
 ## DOC
+
+#### Supported data types
+
+- Fixed length types:
+  - byte, char, short, int, long, double, float
+- Variable length types (optimized space):
+  - int, long, negative int, negative long
+- Complex types:
+  - String and byte[] (using Variable Length Int or Fixed Int32 for sizes)
+  - HexString
+  - String Collection
+  - String Map
+
+#### Features
+
+- Compression (Deflate)
+- Encryption (AES/CBC/PKCS5Padding)
+  - Default IV
+  - Shared IV
+  - Random IV
+- CRC-8 ([CRC-8 poly 0xD5](https://en.wikipedia.org/wiki/Cyclic_redundancy_check))
+- Hash ([MessageDigest](http://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#MessageDigest)) 
+- HMAC ([Mac](http://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#Mac))
 
 #### Usage Example
 
@@ -68,14 +91,20 @@ Add the Packer dependency to your pom.xml:
     <dependency>
         <groupId>org.packer</groupId>
         <artifactId>packer</artifactId>
-        <version>0.0.6</version>
+        <version>0.0.7</version>
     </dependency>
 
 ---
 
+
 ## Benchmarks
 
 ###### TODO
+
+
+## TODOs
+
+- Buffer Auto-Expansion
 
 
 ---
