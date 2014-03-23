@@ -13,7 +13,6 @@ public class Example {
 		System.out.println("--- Sample 1");
 		// Sample usage (output):
 		Packer p = new Packer();
-		p.useFlagFooter(false);
 		p.useCompress(true);                // Enable Compression
 		p.useAES("secret", true);           // Enable Encryption (AES)
 		p.useCRC(true);                     // Enable CRC
@@ -47,7 +46,6 @@ public class Example {
 		System.out.println("--- Sample 2");
 		// Sample usage (load):
 		p = new Packer();
-		p.useFlagFooter(false);
 		p.useCompress(true);                // Enable Compression
 		p.useAES("secret", true);           // Enable Encryption (AES)
 		p.useCRC(true);                     // Enable CRC
