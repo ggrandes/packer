@@ -40,6 +40,9 @@ import javax.crypto.spec.SecretKeySpec;
 /**
  * Simple Data Packer
  * 
+ * <p><b>This class is not thread-safe, must be externally sinchronized</b>
+ * <p>
+ * 
  * Sample usage (output):
  * 
  * <code><blockquote><pre>
