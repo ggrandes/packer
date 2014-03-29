@@ -40,7 +40,8 @@ import javax.crypto.spec.SecretKeySpec;
 /**
  * Simple Data Packer
  * 
- * <p><b>This class is not thread-safe, must be externally sinchronized</b>
+ * <p>
+ * <b>This class is not thread-safe, must be externally sinchronized</b>
  * <p>
  * 
  * Sample usage (output):
@@ -306,7 +307,9 @@ public class Packer {
 	}
 
 	private final byte[] generateRandomIV(final int outlen) {
-		return rnd.generateSeed(outlen);
+		final byte[] buf = new byte[outlen];
+		rnd.nextBytes(buf);
+		return buf;
 	}
 
 	private final byte[] generateMdfromString(final String shared, final int outlen)
