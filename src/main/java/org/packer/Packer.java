@@ -18,6 +18,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.InvalidKeyException;
+import java.security.Key;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -92,8 +95,10 @@ public class Packer {
 	public static final int FLAG_HASH = 0x08;
 	public static final int FLAG_HMAC = 0x10;
 	public static final int FLAG_RANDOM_IV = 0x20;
+	public static final int FLAG_RSA = 0x40;
 
 	static final String CIPHER_CHAIN_PADDING = "AES/CBC/PKCS5Padding";
+	static final String ASYM_CIPHER_CHAIN_PADDING = "RSA/ECB/PKCS1Padding";
 	static final String CIPHER = "AES";
 	static final Charset charsetUTF8 = Charset.forName("UTF-8");
 	static final Charset charsetISOLatin1 = Charset.forName("ISO-8859-1");
@@ -113,6 +118,10 @@ public class Packer {
 	Cipher aesCipher = null;
 	int aesCipherLen = -1;
 	SecretKeySpec aesKey = null;
+	// RSA
+	Cipher rsaCipher = null;
+	Key rsaKeyForEncrypt = null;
+	Key rsaKeyForDecrypt = null;
 
 	final ByteBuffer buf;
 	boolean useFlagFooter = true;
@@ -336,6 +345,39 @@ public class Packer {
 			throw new NoSuchAlgorithmException();
 		}
 		return MessageDigest.getInstance(mdAlg);
+	}
+
+	/**
+	 * Sets he usage of "RSA/ECB/PKCS1Padding" for encryption (default no)
+	 * 
+	 * @param rsaKeyForEncrypt
+	 * @param rsaKeyForDecrypt
+	 * @return
+	 * @throws NoSuchPaddingException
+	 * @throws NoSuchAlgorithmException
+	 */
+	public Packer useRSA(final Key rsaKeyForEncrypt, final Key rsaKeyForDecrypt)
+			throws NoSuchAlgorithmException, NoSuchPaddingException {
+		this.rsaCipher = Cipher.getInstance(ASYM_CIPHER_CHAIN_PADDING);
+		this.rsaKeyForEncrypt = rsaKeyForEncrypt;
+		this.rsaKeyForDecrypt = rsaKeyForDecrypt;
+		return this;
+	}
+
+	/**
+	 * Generate RSA KeyPair
+	 * 
+	 * @param keyLen in bits (2048 recomended)
+	 * @return
+	 * @throws NoSuchAlgorithmException
+	 */
+	public static KeyPair generateKeyPair(final int keyLen) throws NoSuchAlgorithmException {
+		final String name = ASYM_CIPHER_CHAIN_PADDING;
+		final int offset = name.indexOf('/');
+		final String alg = ((offset < 0) ? name : name.substring(0, offset));
+		final KeyPairGenerator generator = KeyPairGenerator.getInstance(alg);
+		generator.initialize(keyLen);
+		return generator.genKeyPair();
 	}
 
 	/**
@@ -654,7 +696,7 @@ public class Packer {
 			try {
 				tmpBuf = crypto(tmpBuf, 0, len, false);
 			} catch (Exception e) {
-				throw new IllegalArgumentException("Encryption failed", e);
+				throw new IllegalArgumentException("AES Encryption failed", e);
 			}
 			len = tmpBuf.length;
 			//
@@ -665,6 +707,15 @@ public class Packer {
 				System.arraycopy(ivBuf, 0, tmpBuf, len, ivBuf.length);
 				len = tmpBuf.length;
 			}
+		}
+		if (rsaKeyForEncrypt != null) {
+			flags |= FLAG_RSA;
+			try {
+				tmpBuf = cryptoAsym(tmpBuf, 0, len, false);
+			} catch (Exception e) {
+				throw new IllegalArgumentException("RSA Encryption failed", e);
+			}
+			len = tmpBuf.length;
 		}
 		if (useCRC) {
 			flags |= FLAG_CRC;
@@ -1080,9 +1131,19 @@ public class Packer {
 				throw new InvalidInputDataException("Invalid CRC");
 			inlen -= 1;
 		}
+		if (checkFlag(flags, FLAG_RSA)) {
+			if (rsaKeyForDecrypt == null)
+				throw new InvalidInputDataException("Invalid Flags (Crypto) or RSA crypto not initialized");
+			try {
+				in = cryptoAsym(in, 0, inlen, true);
+			} catch (Exception e) {
+				throw new InvalidInputDataException("Invalid RSA Crypto data", e);
+			}
+			inlen = in.length;
+		}
 		if (checkFlag(flags, FLAG_AES)) {
 			if (aesKey == null)
-				throw new InvalidInputDataException("Invalid Flags (Crypto) or crypto not initialized");
+				throw new InvalidInputDataException("Invalid Flags (Crypto) or AES crypto not initialized");
 			if (checkFlag(flags, FLAG_RANDOM_IV)) {
 				final int ivLen = aesCipherLen;
 				final byte[] ivBuf = new byte[ivLen];
@@ -1093,7 +1154,7 @@ public class Packer {
 			try {
 				in = crypto(in, 0, inlen, true);
 			} catch (Exception e) {
-				throw new InvalidInputDataException("Invalid Crypto data", e);
+				throw new InvalidInputDataException("Invalid AES Crypto data", e);
 			}
 			inlen = in.length;
 		}
@@ -1192,6 +1253,27 @@ public class Packer {
 			BadPaddingException {
 		aesCipher.init(decrypt ? Cipher.DECRYPT_MODE : Cipher.ENCRYPT_MODE, aesKey, aesIV);
 		return aesCipher.doFinal(input, offset, len);
+	}
+
+	/**
+	 * Encrypt or Decrypt with RSA
+	 * 
+	 * @param input
+	 * @param offset
+	 * @param len
+	 * @param decrypt
+	 * @return
+	 * @throws InvalidAlgorithmParameterException
+	 * @throws InvalidKeyException
+	 * @throws BadPaddingException
+	 * @throws IllegalBlockSizeException
+	 */
+	final byte[] cryptoAsym(final byte[] input, final int offset, final int len, final boolean decrypt)
+			throws InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException,
+			BadPaddingException {
+		rsaCipher.init(decrypt ? Cipher.DECRYPT_MODE : Cipher.ENCRYPT_MODE, decrypt ? rsaKeyForDecrypt
+				: rsaKeyForEncrypt);
+		return rsaCipher.doFinal(input, offset, len);
 	}
 
 	/**

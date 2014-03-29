@@ -1,5 +1,6 @@
 package org.packer.example;
 
+import java.security.KeyPair;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -10,14 +11,16 @@ import org.packer.Packer;
 public class Example {
 
 	public static void main(final String[] args) throws Exception {
+		KeyPair kp = Packer.generateKeyPair(2048); // Generate KeyPair (RSA)
 		System.out.println("--- Sample 1");
 		// Sample usage (output):
 		Packer p = new Packer();
-		p.useCompress(true);                // Enable Compression
-		p.useAES("secret", true);           // Enable Encryption (AES)
-		p.useCRC(true);                     // Enable CRC
-		p.useHASH("SHA-256");               // Enable HASH (SHA-256)
-		p.useHMAC("HmacSHA256", "secret");  // Enable Hash-MAC (SHA-256)
+		p.useCompress(true);                       // Enable Compression
+		p.useAES("secret", true);                  // Enable Encryption (AES)
+		p.useRSA(kp.getPublic(), kp.getPrivate()); // Enable Encryption (RSA)
+		p.useCRC(true);                            // Enable CRC
+		p.useHASH("SHA-256");                      // Enable HASH (SHA-256)
+		p.useHMAC("HmacSHA256", "secret");         // Enable Hash-MAC (SHA-256)
 		String s1 = "hello", s2 = "world";
 		String hs = "df0c290eae2b";
 		byte b = 42;
@@ -46,11 +49,12 @@ public class Example {
 		System.out.println("--- Sample 2");
 		// Sample usage (load):
 		p = new Packer();
-		p.useCompress(true);                // Enable Compression
-		p.useAES("secret", true);           // Enable Encryption (AES)
-		p.useCRC(true);                     // Enable CRC
-		p.useHASH("SHA-256");               // Enable HASH (SHA-256)
-		p.useHMAC("HmacSHA256", "secret");  // Enable Hash-MAC (SHA-256)
+		p.useCompress(true);                       // Enable Compression
+		p.useAES("secret", true);                  // Enable Encryption (AES)
+		p.useRSA(kp.getPublic(), kp.getPrivate()); // Enable Encryption (RSA)
+		p.useCRC(true);                            // Enable CRC
+		p.useHASH("SHA-256");                      // Enable HASH (SHA-256)
+		p.useHMAC("HmacSHA256", "secret");         // Enable Hash-MAC (SHA-256)
 		p.loadStringBase64URLSafe(out);
 		Collection<String> sc2 = new ArrayList<String>();
 		System.out.println(s1 + "\t" + p.getString());
