@@ -96,6 +96,7 @@ public class Packer {
 	public static final int FLAG_HMAC = 0x10;
 	public static final int FLAG_RANDOM_IV = 0x20;
 	public static final int FLAG_RSA = 0x40;
+	public static final int FLAG_RANDOM_INT_IV = 0x80;
 
 	static final String CIPHER_CHAIN_PADDING = "AES/CBC/PKCS5Padding";
 	static final String ASYM_CIPHER_CHAIN_PADDING = "RSA/ECB/PKCS1Padding";
@@ -113,7 +114,8 @@ public class Packer {
 	// AES
 	byte[] fakeIV = "fKnuy=eimE-Lid2Th$s/3pJS$#vzk4:86UBU:WX$X7GjyB-yrv!+IsJ-nSCGF63SR_9tjt.w9ngxS.WmkVzGY2QycbUWNILc8ZyZguaNE2=D6htKMsmP2EKb9BHsJW4B"
 			.getBytes(charsetISOLatin1); // Default shared IV
-	boolean randomIV = false;
+	AESTYPEIV aesTypeIV = AESTYPEIV.FAKE_IV; // 0=No IV
+	int integerIV = Integer.MIN_VALUE;
 	IvParameterSpec aesIV = null;
 	Cipher aesCipher = null;
 	int aesCipherLen = -1;
@@ -274,7 +276,26 @@ public class Packer {
 	public Packer useAES(final String passphrase, final String sharedIV) throws NoSuchAlgorithmException,
 			NoSuchPaddingException {
 		initCipher();
-		initCipherIV(generateMdfromString(sharedIV, aesCipherLen), false);
+		initCipherIV(generateMdfromString(sharedIV, aesCipherLen), AESTYPEIV.SHARED_IV);
+		initCipherKey(passphrase);
+		return this;
+	}
+
+	/**
+	 * Sets he usage of "AES/CBC/PKCS5Padding" with a Random Integer IV for encryption (default no). Instead
+	 * of use full-random-IV, use a integer seed (this allow compact output)
+	 * 
+	 * @param passphrase shared secret
+	 * 
+	 * @return
+	 * @throws NoSuchAlgorithmException
+	 * @throws NoSuchPaddingException
+	 */
+	public Packer useAESwithRandomIntIV(final String passphrase) throws NoSuchAlgorithmException,
+			NoSuchPaddingException {
+		initCipher();
+		integerIV = (rnd.nextInt() & 0x7FFFFFFF);
+		initCipherIV(generateMdfromInteger(this.integerIV, aesCipherLen), AESTYPEIV.RANDOM_INT_IV);
 		initCipherKey(passphrase);
 		return this;
 	}
@@ -292,7 +313,8 @@ public class Packer {
 	public Packer useAES(final String passphrase, final boolean useRandomIV) throws NoSuchAlgorithmException,
 			NoSuchPaddingException {
 		initCipher();
-		initCipherIV((useRandomIV ? generateRandomIV(aesCipherLen) : getDefaultIV(aesCipherLen)), useRandomIV);
+		initCipherIV((useRandomIV ? generateRandomIV(aesCipherLen) : getDefaultIV(aesCipherLen)),
+				(useRandomIV ? AESTYPEIV.RANDOM_IV : AESTYPEIV.FAKE_IV));
 		initCipherKey(passphrase);
 		return this;
 	}
@@ -302,9 +324,9 @@ public class Packer {
 		aesCipherLen = aesCipher.getBlockSize();
 	}
 
-	private final void initCipherIV(final byte[] iv, final boolean isRandomIV) {
-		randomIV = isRandomIV;
-		aesIV = new IvParameterSpec(resizeBuffer(iv, aesCipherLen));
+	private final void initCipherIV(final byte[] iv, final AESTYPEIV aesTypeIV) {
+		this.aesTypeIV = aesTypeIV;
+		this.aesIV = new IvParameterSpec(resizeBuffer(iv, aesCipherLen));
 	}
 
 	private final void initCipherKey(final String passphrase) throws NoSuchAlgorithmException {
@@ -321,12 +343,33 @@ public class Packer {
 		return buf;
 	}
 
-	private final byte[] generateMdfromString(final String shared, final int outlen)
+	private final byte[] generateMdfromString(final String input, final int outlen)
 			throws NoSuchAlgorithmException {
 		final MessageDigest md = getMessageDigestForLength(outlen);
-		final byte[] buf = shared.getBytes(charsetUTF8);
+		final byte[] buf = input.getBytes(charsetUTF8);
 		md.update(buf, 0, buf.length);
 		return resizeBuffer(md.digest(), outlen);
+	}
+
+	private final byte[] generateMdfromBuffer(final byte[] buf, final int outlen)
+			throws NoSuchAlgorithmException {
+		final MessageDigest md = getMessageDigestForLength(outlen);
+		md.update(buf, 0, buf.length);
+		return resizeBuffer(md.digest(), outlen);
+	}
+
+	private final byte[] generateMdfromInteger(final int input, final int outlen)
+			throws NoSuchAlgorithmException {
+		return generateMdfromBuffer(intToByteArray(input), outlen);
+	}
+
+	private static final byte[] intToByteArray(final int value) {
+		return new byte[] {
+				(byte) (value >>> 24), //
+				(byte) (value >>> 16), //
+				(byte) (value >>> 8),  //
+				(byte) value
+		};
 	}
 
 	private final MessageDigest getMessageDigestForLength(final int outlen) throws NoSuchAlgorithmException {
@@ -700,12 +743,25 @@ public class Packer {
 			}
 			len = tmpBuf.length;
 			//
-			if ((aesIV != null) && randomIV) { // useAES + randomIV
-				flags |= FLAG_RANDOM_IV;
-				final byte[] ivBuf = aesIV.getIV();
-				tmpBuf = resizeBuffer(tmpBuf, len + ivBuf.length);
-				System.arraycopy(ivBuf, 0, tmpBuf, len, ivBuf.length);
-				len = tmpBuf.length;
+			if (aesIV != null) {
+				switch (aesTypeIV) {
+					case RANDOM_IV: { // useAES + randomIV
+						flags |= FLAG_RANDOM_IV;
+						final byte[] ivBuf = aesIV.getIV();
+						tmpBuf = resizeBuffer(tmpBuf, len + ivBuf.length);
+						System.arraycopy(ivBuf, 0, tmpBuf, len, ivBuf.length);
+						len = tmpBuf.length;
+						break;
+					}
+					case RANDOM_INT_IV: { // useAES + integerIV
+						flags |= FLAG_RANDOM_INT_IV;
+						final byte[] ivBuf = intToByteArray(integerIV);
+						tmpBuf = resizeBuffer(tmpBuf, len + ivBuf.length);
+						System.arraycopy(ivBuf, 0, tmpBuf, len, ivBuf.length);
+						len = tmpBuf.length;
+						break;
+					}
+				}
 			}
 		}
 		if (rsaKeyForEncrypt != null) {
@@ -1091,8 +1147,14 @@ public class Packer {
 				flags |= FLAG_COMPRESS;
 			if (aesKey != null) {
 				flags |= FLAG_AES;
-				if (randomIV) // useAES + randomIV
-					flags |= FLAG_RANDOM_IV;
+				switch (aesTypeIV) { // useAES + randomIV
+					case RANDOM_IV:
+						flags |= FLAG_RANDOM_IV;
+						break;
+					case RANDOM_INT_IV:
+						flags |= FLAG_RANDOM_INT_IV;
+						break;
+				}
 			}
 			if (useCRC)
 				flags |= FLAG_CRC;
@@ -1148,7 +1210,17 @@ public class Packer {
 				final int ivLen = aesCipherLen;
 				final byte[] ivBuf = new byte[ivLen];
 				System.arraycopy(in, inlen - ivLen, ivBuf, 0, ivLen);
-				initCipherIV(ivBuf, true);
+				initCipherIV(ivBuf, AESTYPEIV.RANDOM_IV);
+				inlen -= ivLen;
+			} else if (checkFlag(flags, FLAG_RANDOM_INT_IV)) {
+				final int ivLen = 4; // Integer length
+				final byte[] ivBuf = new byte[ivLen];
+				System.arraycopy(in, inlen - ivLen, ivBuf, 0, ivLen);
+				try {
+					initCipherIV(generateMdfromBuffer(ivBuf, aesCipherLen), AESTYPEIV.RANDOM_INT_IV);
+				} catch (Exception e) {
+					throw new InvalidInputDataException("Invalid AES Crypto data (RANDOM_INT_IV)", e);
+				}
 				inlen -= ivLen;
 			}
 			try {
@@ -1561,5 +1633,9 @@ public class Packer {
 		public InvalidInputDataException(final String text, final Exception e) {
 			super(text, e);
 		}
+	}
+
+	static enum AESTYPEIV {
+		FAKE_IV, SHARED_IV, RANDOM_IV, RANDOM_INT_IV
 	}
 }

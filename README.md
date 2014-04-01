@@ -2,7 +2,7 @@
 
 Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Java project under Apache License v2.0
 
-### Current Development Version is [0.0.9](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.9/packer-0.0.9.jar)
+### Current Development Version is [0.0.10](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.10/packer-0.0.10.jar)
 
 ---
 
@@ -27,6 +27,7 @@ Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Jav
   - Default IV
   - Shared IV
   - Random IV
+  - Random Integer IV (compact IV)
 - Encryption (RSA/ECB/PKCS1Padding)
 - CRC-8 ([CRC-8 poly 0xD5](https://en.wikipedia.org/wiki/Cyclic_redundancy_check))
 - Hash ([MessageDigest](http://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#MessageDigest)) 
@@ -92,7 +93,7 @@ Add the Packer dependency to your pom.xml:
     <dependency>
         <groupId>org.packer</groupId>
         <artifactId>packer</artifactId>
-        <version>0.0.9</version>
+        <version>0.0.10</version>
     </dependency>
 
 ---
