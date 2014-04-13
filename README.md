@@ -2,7 +2,7 @@
 
 Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Java project under Apache License v2.0
 
-### Current Development Version is [0.0.10](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.10/packer-0.0.10.jar)
+### Current Development Version is [0.0.11](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.11/packer-0.0.11.jar)
 
 ---
 
@@ -93,7 +93,7 @@ Add the Packer dependency to your pom.xml:
     <dependency>
         <groupId>org.packer</groupId>
         <artifactId>packer</artifactId>
-        <version>0.0.10</version>
+        <version>0.0.11</version>
     </dependency>
 
 ---
