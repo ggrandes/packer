@@ -796,6 +796,8 @@ public class Packer {
 		if (useFlagFooter) {
 			tmpBuf = resizeBuffer(tmpBuf, ++len);
 			tmpBuf[len - 1] = (byte) (flags & 0xFF);
+		} else {
+			tmpBuf = resizeBuffer(tmpBuf, len);
 		}
 		return tmpBuf;
 	}
@@ -1138,6 +1140,7 @@ public class Packer {
 	 * @see #outputBytes()
 	 */
 	public Packer loadBytes(byte[] in) throws InvalidInputDataException {
+		// TODO: Improve input data parsing exceptions
 		int inlen = in.length;
 		int flags = 0;
 		if (useFlagFooter) {
