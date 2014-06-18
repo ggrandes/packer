@@ -2,7 +2,7 @@
 
 Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Java project under Apache License v2.0
 
-### Current Development Version is [0.0.11](https://maven-release.s3.amazonaws.com/release/org/packer/packer/0.0.11/packer-0.0.11.jar)
+### Current Development Version is [0.0.12](https://maven-release.s3.amazonaws.com/release/org/javastack/packer/0.0.12/packer-0.0.12.jar)
 
 ---
 
@@ -36,7 +36,7 @@ Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Jav
 #### Usage Example
 
 ```java
-import org.packer.Packer;
+import org.javastack.Packer;
 
 public class Example {
 	public static void main(final String[] args) {
@@ -73,13 +73,13 @@ public class Example {
 }
 ```
 
-* Full examples in [Example package](https://github.com/ggrandes/packer/tree/master/src/main/java/org/packer/example/)
+* Full examples in [Example package](https://github.com/ggrandes/packer/tree/master/src/main/java/org/javastack/example/)
 
 ---
 
 ## MAVEN
 
-Add the Packer maven repository location to your pom.xml: 
+Add the maven repository location to your pom.xml: 
 
     <repositories>
         <repository>
@@ -88,12 +88,12 @@ Add the Packer maven repository location to your pom.xml:
         </repository>
     </repositories>
 
-Add the Packer dependency to your pom.xml:
+Add the dependency to your pom.xml:
 
     <dependency>
-        <groupId>org.packer</groupId>
+        <groupId>org.javastack</groupId>
         <artifactId>packer</artifactId>
-        <version>0.0.11</version>
+        <version>0.0.12</version>
     </dependency>
 
 ---
