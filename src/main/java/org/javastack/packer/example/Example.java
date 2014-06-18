@@ -1,4 +1,4 @@
-package org.javastack.example;
+package org.javastack.packer.example;
 
 import java.security.KeyPair;
 import java.util.ArrayList;
@@ -6,7 +6,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import org.javastack.Packer;
+import org.javastack.packer.Packer;
 
 public class Example {
 

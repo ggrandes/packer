@@ -36,7 +36,7 @@ Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Jav
 #### Usage Example
 
 ```java
-import org.javastack.Packer;
+import org.javastack.packer.Packer;
 
 public class Example {
 	public static void main(final String[] args) {
@@ -73,7 +73,7 @@ public class Example {
 }
 ```
 
-* Full examples in [Example package](https://github.com/ggrandes/packer/tree/master/src/main/java/org/javastack/example/)
+* Full examples in [Example package](https://github.com/ggrandes/packer/tree/master/src/main/java/org/javastack/packer/example/)
 
 ---
 
