@@ -4,7 +4,7 @@
 
 	<groupId>org.javastack</groupId>
 	<artifactId>packer</artifactId>
-	<version>0.0.12</version>
+	<version>1.0.0</version>
 
 	<build>
 		<plugins>
