@@ -2,7 +2,7 @@
 
 Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Java project under Apache License v2.0
 
-### Current Stable Version is [1.0.0](http://search.maven.org/remotecontent?filepath=org/javastack/packer/1.0.0/packer-1.0.0.jar)
+### Current Stable Version is [1.0.0](https://search.maven.org/#search|ga|1|g%3Aorg.javastack%20a%3Apacker)
 
 ---
 
