@@ -499,12 +499,15 @@ public class Packer {
 	}
 
 	/**
-	 * Return the underling ByteBuffer
+	 * Return internal buffer as ByteBuffer
 	 * 
 	 * @return
 	 */
 	public ByteBuffer getByteBuffer() {
-		return ByteBuffer.wrap(buf);
+		final ByteBuffer bb = ByteBuffer.wrap(buf);
+		bb.limit(bufLimit);
+		bb.position(bufPosition);
+		return bb;
 	}
 
 	// ------------- PUT -------------
