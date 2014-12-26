@@ -175,8 +175,7 @@ public class Packer {
 	public Packer ensureCapacity(int minCapacity) {
 		if (minCapacity <= buf.length)
 			return this;
-		AutoExtendPolicy policy = autoExtendPolicy;
-		switch (policy) {
+		switch (autoExtendPolicy) {
 			case NONE:
 				return this;
 			case MINIMAL:
