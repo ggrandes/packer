@@ -50,8 +50,9 @@ import javax.crypto.spec.SecretKeySpec;
  * Sample usage (output):
  * 
  * <code><blockquote><pre>
- * Packer p = new Packer();
+ * Packer p = new Packer(16);
  * p.useCompress(false);
+ * p.setAutoExtendPolicy(AutoExtendPolicy.AUTO);
  * p.useCRC(false);
  * String s1 = "hello", s2 = "world";
  * String hs = "df0c290eae2b";
@@ -71,7 +72,8 @@ import javax.crypto.spec.SecretKeySpec;
  * Sample usage (load):
  * 
  * <code><blockquote><pre>
- * p = new Packer();
+ * p = new Packer(16);
+ * p.setAutoExtendPolicy(AutoExtendPolicy.AUTO);
  * p.useCompress(false);
  * p.useCRC(false);
  * p.loadStringBase64URLSafe(input);
@@ -125,7 +127,10 @@ public class Packer {
 	Key rsaKeyForEncrypt = null;
 	Key rsaKeyForDecrypt = null;
 
-	final ByteBuffer buf;
+	byte[] buf;
+	int bufLimit;
+	int bufPosition = 0;
+	AutoExtendPolicy autoExtendPolicy = AutoExtendPolicy.NONE;
 	boolean useFlagFooter = true;
 	boolean useCompress = false;
 	boolean useCRC = false;
@@ -146,7 +151,54 @@ public class Packer {
 	 * @see java.nio.ByteBuffer
 	 */
 	public Packer(final int size) {
-		this.buf = ByteBuffer.allocate(size);
+		buf = new byte[Math.min(1, size)];
+		bufLimit = buf.length;
+	}
+
+	/**
+	 * Set Auto Extend Policy for Buffer
+	 * 
+	 * @param autoExtendPolicy
+	 * @return
+	 */
+	public Packer setAutoExtendPolicy(final AutoExtendPolicy autoExtendPolicy) {
+		this.autoExtendPolicy = autoExtendPolicy;
+		return this;
+	}
+
+	/**
+	 * Ensure capacity
+	 * 
+	 * @param minCapacity
+	 * @return
+	 */
+	public Packer ensureCapacity(int minCapacity) {
+		if (minCapacity <= buf.length)
+			return this;
+		AutoExtendPolicy policy = autoExtendPolicy;
+		switch (policy) {
+			case NONE:
+				return this;
+			case MINIMAL:
+				break;
+			case AUTO:
+				minCapacity = roundAuto(minCapacity);
+				break;
+			case ROUND8:
+				minCapacity = round(minCapacity, 8);
+				break;
+			case ROUND512:
+				minCapacity = round(minCapacity, 512);
+				break;
+			case ROUND4096:
+				minCapacity = round(minCapacity, 4096);
+				break;
+		}
+		final byte[] newbuf = new byte[minCapacity];
+		System.arraycopy(buf, 0, newbuf, 0, Math.min(buf.length, newbuf.length));
+		buf = newbuf;
+		bufLimit = buf.length;
+		return this;
 	}
 
 	/**
@@ -155,7 +207,8 @@ public class Packer {
 	 * @return
 	 */
 	public Packer clear() {
-		buf.clear();
+		this.bufPosition = 0;
+		this.bufLimit = buf.length;
 		return this;
 	}
 
@@ -165,7 +218,8 @@ public class Packer {
 	 * @return
 	 */
 	public Packer flip() {
-		buf.flip();
+		bufLimit = bufPosition;
+		bufPosition = 0;
 		return this;
 	}
 
@@ -175,7 +229,7 @@ public class Packer {
 	 * @return
 	 */
 	public Packer rewind() {
-		buf.rewind();
+		bufPosition = 0;
 		return this;
 	}
 
@@ -363,6 +417,27 @@ public class Packer {
 		return generateMdfromBuffer(intToByteArray(input), outlen);
 	}
 
+	private static final int round(final int in, final int round) {
+		int out = (in & ~(round - 1)); // 7
+		if (out != in) {
+			out += round; // 8
+		}
+		return out;
+	}
+
+	private static final int roundAuto(final int in) {
+		final int r4K = 4096;
+		if (in > r4K) {
+			return round(in, r4K);
+		}
+		for (int i = 16; i <= r4K; i <<= 1) {
+			if (in < i) {
+				return i;
+			}
+		}
+		return round(in, r4K);
+	}
+
 	private static final byte[] intToByteArray(final int value) {
 		return new byte[] {
 				(byte) (value >>> 24), //
@@ -429,7 +504,7 @@ public class Packer {
 	 * @return
 	 */
 	public ByteBuffer getByteBuffer() {
-		return buf;
+		return ByteBuffer.wrap(buf);
 	}
 
 	// ------------- PUT -------------
@@ -442,7 +517,8 @@ public class Packer {
 	 * @see #getByte()
 	 */
 	public Packer putByte(final byte value) {
-		buf.put(value);
+		ensureCapacity(bufPosition + 1);
+		buf[bufPosition++] = value;
 		return this;
 	}
 
@@ -454,7 +530,9 @@ public class Packer {
 	 * @see #getChar()
 	 */
 	public Packer putChar(final char value) {
-		buf.putChar(value);
+		ensureCapacity(bufPosition + 2);
+		buf[bufPosition++] = (byte) (value >> 8);
+		buf[bufPosition++] = (byte) (value);
 		return this;
 	}
 
@@ -466,7 +544,9 @@ public class Packer {
 	 * @see #getShort()
 	 */
 	public Packer putShort(final short value) {
-		buf.putShort(value);
+		ensureCapacity(bufPosition + 2);
+		buf[bufPosition++] = (byte) (value >> 8);
+		buf[bufPosition++] = (byte) (value);
 		return this;
 	}
 
@@ -478,7 +558,7 @@ public class Packer {
 	 * @see #getDouble()
 	 */
 	public Packer putDouble(final double value) {
-		buf.putDouble(value);
+		putLong(Double.doubleToRawLongBits(value));
 		return this;
 	}
 
@@ -490,7 +570,7 @@ public class Packer {
 	 * @see #getFloat()
 	 */
 	public Packer putFloat(final float value) {
-		buf.putFloat(value);
+		putInt(Float.floatToRawIntBits(value));
 		return this;
 	}
 
@@ -502,7 +582,11 @@ public class Packer {
 	 * @see #getInt()
 	 */
 	public Packer putInt(final int value) {
-		buf.putInt(value);
+		ensureCapacity(bufPosition + 4);
+		buf[bufPosition++] = (byte) (value >> 24);
+		buf[bufPosition++] = (byte) (value >> 16);
+		buf[bufPosition++] = (byte) (value >> 8);
+		buf[bufPosition++] = (byte) (value);
 		return this;
 	}
 
@@ -514,7 +598,15 @@ public class Packer {
 	 * @see #getLong()
 	 */
 	public Packer putLong(final long value) {
-		buf.putLong(value);
+		ensureCapacity(bufPosition + 8);
+		buf[bufPosition++] = (byte) (value >> 56);
+		buf[bufPosition++] = (byte) (value >> 48);
+		buf[bufPosition++] = (byte) (value >> 40);
+		buf[bufPosition++] = (byte) (value >> 32);
+		buf[bufPosition++] = (byte) (value >> 24);
+		buf[bufPosition++] = (byte) (value >> 16);
+		buf[bufPosition++] = (byte) (value >> 8);
+		buf[bufPosition++] = (byte) (value);
 		return this;
 	}
 
@@ -525,8 +617,14 @@ public class Packer {
 	 * @return
 	 * @see #getVInt()
 	 */
-	public Packer putVInt(final int value) {
-		encodeVInt(buf, value);
+	public Packer putVInt(int value) {
+		ensureCapacity(bufPosition + 4 + 1);
+		int i = 0;
+		while (((value & ~0x7FL) != 0L) && ((i += 7) < 32)) {
+			buf[bufPosition++] = ((byte) ((value & 0x7FL) | 0x80L));
+			value >>>= 7;
+		}
+		buf[bufPosition++] = ((byte) value);
 		return this;
 	}
 
@@ -538,7 +636,7 @@ public class Packer {
 	 * @see #getVNegInt()
 	 */
 	public Packer putVNegInt(final int value) {
-		encodeVInt(buf, -value);
+		putVInt(-value);
 		return this;
 	}
 
@@ -549,8 +647,15 @@ public class Packer {
 	 * @return
 	 * @see #getVLong()
 	 */
-	public Packer putVLong(final long value) {
-		encodeVLong(buf, value);
+	public Packer putVLong(long value) {
+		ensureCapacity(bufPosition + 8 + 2);
+		// org.apache.lucene.util.packed.AbstractBlockPackedWriter
+		int i = 0;
+		while (((value & ~0x7FL) != 0L) && ((i += 7) < 64)) {
+			buf[bufPosition++] = ((byte) ((value & 0x7FL) | 0x80L));
+			value >>>= 7;
+		}
+		buf[bufPosition++] = ((byte) value);
 		return this;
 	}
 
@@ -562,7 +667,7 @@ public class Packer {
 	 * @see #getVNegLong()
 	 */
 	public Packer putVNegLong(final long value) {
-		encodeVLong(buf, -value);
+		putVLong(-value);
 		return this;
 	}
 
@@ -574,8 +679,10 @@ public class Packer {
 	 * @see #getBytes()
 	 */
 	public Packer putBytes(final byte[] value) {
-		encodeVInt(buf, value.length);
-		buf.put(value);
+		putVInt(value.length);
+		ensureCapacity(bufPosition + value.length);
+		System.arraycopy(value, 0, buf, bufPosition, value.length);
+		bufPosition += value.length;
 		return this;
 	}
 
@@ -587,8 +694,10 @@ public class Packer {
 	 * @see #getBytes()
 	 */
 	public Packer putBytesF(final byte[] value) {
-		buf.putInt(value.length);
-		buf.put(value);
+		putInt(value.length);
+		ensureCapacity(bufPosition + value.length);
+		System.arraycopy(value, 0, buf, bufPosition, value.length);
+		bufPosition += value.length;
 		return this;
 	}
 
@@ -600,7 +709,7 @@ public class Packer {
 	 * @see #getString()
 	 */
 	public Packer putString(final String value) {
-		encodeString(buf, value);
+		putBytes(value.getBytes(charsetUTF8));
 		return this;
 	}
 
@@ -612,7 +721,7 @@ public class Packer {
 	 * @see #getString()
 	 */
 	public Packer putStringF(final String value) {
-		encodeStringF(buf, value);
+		putBytesF(value.getBytes(charsetUTF8));
 		return this;
 	}
 
@@ -627,9 +736,11 @@ public class Packer {
 	 */
 	public Packer putHexString(final String value) throws IllegalArgumentException {
 		try {
-			byte[] hex = fromHex(value);
-			encodeVInt(buf, hex.length);
-			buf.put(hex);
+			final byte[] hex = fromHex(value);
+			putVInt(hex.length);
+			ensureCapacity(bufPosition + hex.length);
+			System.arraycopy(hex, 0, buf, bufPosition, hex.length);
+			bufPosition += hex.length;
 		} catch (ParseException e) {
 			throw new IllegalArgumentException("Invalid input string", e);
 		}
@@ -644,9 +755,9 @@ public class Packer {
 	 * @see #getStringCollection(Collection)
 	 */
 	public Packer putStringCollection(final Collection<String> collection) {
-		encodeVInt(buf, collection.size());
+		putVInt(collection.size());
 		for (final String value : collection) {
-			encodeString(buf, value);
+			putString(value);
 		}
 		return this;
 	}
@@ -659,12 +770,12 @@ public class Packer {
 	 * @see #getStringMap(Map)
 	 */
 	public Packer putStringMap(final Map<String, String> map) {
-		encodeVInt(buf, map.size());
+		putVInt(map.size());
 		for (final Entry<String, String> e : map.entrySet()) {
 			final String key = e.getKey();
 			final String value = e.getValue();
-			encodeString(buf, key);
-			encodeString(buf, value);
+			putString(key);
+			putString(value);
 		}
 		return this;
 	}
@@ -726,8 +837,8 @@ public class Packer {
 	 * @see #useHASH(String)
 	 */
 	public byte[] outputBytes() {
-		byte[] tmpBuf = buf.array();
-		int len = buf.limit();
+		byte[] tmpBuf = buf;
+		int len = bufLimit;
 		int flags = 0;
 		if (useCompress) {
 			flags |= FLAG_COMPRESS;
@@ -811,7 +922,7 @@ public class Packer {
 	 * @see #putByte(byte)
 	 */
 	public byte getByte() {
-		return buf.get();
+		return buf[bufPosition++];
 	}
 
 	/**
@@ -821,7 +932,7 @@ public class Packer {
 	 * @see #putChar(char)
 	 */
 	public char getChar() {
-		return buf.getChar();
+		return (char) (((getByte() & 0xFF) << 8) | (getByte() & 0xFF));
 	}
 
 	/**
@@ -831,7 +942,7 @@ public class Packer {
 	 * @see #putShort(short)
 	 */
 	public short getShort() {
-		return buf.getShort();
+		return (short) (((getByte() & 0xFF) << 8) | (getByte() & 0xFF));
 	}
 
 	/**
@@ -841,7 +952,7 @@ public class Packer {
 	 * @see #putDouble(double)
 	 */
 	public double getDouble() {
-		return buf.getDouble();
+		return Double.longBitsToDouble(getLong());
 	}
 
 	/**
@@ -851,7 +962,7 @@ public class Packer {
 	 * @see #putFloat(float)
 	 */
 	public float getFloat() {
-		return buf.getFloat();
+		return Float.intBitsToFloat(getInt());
 	}
 
 	/**
@@ -861,7 +972,12 @@ public class Packer {
 	 * @see #putInt(int)
 	 */
 	public int getInt() {
-		return buf.getInt();
+		int v = 0;
+		v |= ((getByte() & 0xFF) << 24);
+		v |= ((getByte() & 0xFF) << 16);
+		v |= ((getByte() & 0xFF) << 8);
+		v |= (getByte() & 0xFF);
+		return v;
 	}
 
 	/**
@@ -871,7 +987,16 @@ public class Packer {
 	 * @see #putLong(long)
 	 */
 	public long getLong() {
-		return buf.getLong();
+		long v = 0;
+		v |= ((getByte() & 0xFFL) << 56);
+		v |= ((getByte() & 0xFFL) << 48);
+		v |= ((getByte() & 0xFFL) << 40);
+		v |= ((getByte() & 0xFFL) << 32);
+		v |= ((getByte() & 0xFFL) << 24);
+		v |= ((getByte() & 0xFFL) << 16);
+		v |= ((getByte() & 0xFFL) << 8);
+		v |= (getByte() & 0xFFL);
+		return v;
 	}
 
 	/**
@@ -881,7 +1006,14 @@ public class Packer {
 	 * @see #getVNegInt()
 	 */
 	public int getVInt() {
-		return decodeVInt(buf);
+		int value = 0;
+		for (int i = 0; i <= 32; i += 7) {
+			final byte b = getByte();
+			value |= ((b & 0x7FL) << i);
+			if (b >= 0)
+				return value;
+		}
+		return value;
 	}
 
 	/**
@@ -891,7 +1023,7 @@ public class Packer {
 	 * @see #getVInt()
 	 */
 	public int getVNegInt() {
-		return -decodeVInt(buf);
+		return -getVInt();
 	}
 
 	/**
@@ -901,7 +1033,15 @@ public class Packer {
 	 * @see #getVNegLong()
 	 */
 	public long getVLong() {
-		return decodeVLong(buf);
+		// org.apache.lucene.util.packed.BlockPackedReaderIterator
+		long value = 0;
+		for (int i = 0; i <= 64; i += 7) {
+			final byte b = getByte();
+			value |= ((b & 0x7FL) << i);
+			if (b >= 0)
+				return value;
+		}
+		return value;
 	}
 
 	/**
@@ -911,7 +1051,7 @@ public class Packer {
 	 * @see #getVLong()
 	 */
 	public long getVNegLong() {
-		return -decodeVLong(buf);
+		return -getVLong();
 	}
 
 	/**
@@ -921,9 +1061,10 @@ public class Packer {
 	 * @see #putBytes(byte[])
 	 */
 	public byte[] getBytes() {
-		int len = decodeVInt(buf);
-		byte[] bytes = new byte[len];
-		buf.get(bytes);
+		final int len = getVInt();
+		final byte[] bytes = new byte[len];
+		System.arraycopy(buf, bufPosition, bytes, 0, bytes.length);
+		bufPosition += bytes.length;
 		return bytes;
 	}
 
@@ -934,9 +1075,10 @@ public class Packer {
 	 * @see #putBytes(byte[])
 	 */
 	public byte[] getBytesF() {
-		int len = buf.getInt();
-		byte[] bytes = new byte[len];
-		buf.get(bytes);
+		final int len = getInt();
+		final byte[] bytes = new byte[len];
+		System.arraycopy(buf, bufPosition, bytes, 0, bytes.length);
+		bufPosition += bytes.length;
 		return bytes;
 	}
 
@@ -947,7 +1089,11 @@ public class Packer {
 	 * @see #putString(String)
 	 */
 	public String getString() {
-		return decodeString(buf);
+		final int len = getVInt();
+		final byte[] utf = new byte[len];
+		System.arraycopy(buf, bufPosition, utf, 0, utf.length);
+		bufPosition += utf.length;
+		return new String(utf, 0, len, charsetUTF8);
 	}
 
 	/**
@@ -957,7 +1103,11 @@ public class Packer {
 	 * @see #putString(String)
 	 */
 	public String getStringF() {
-		return decodeStringF(buf);
+		int len = getInt();
+		byte[] utf = new byte[len];
+		System.arraycopy(buf, bufPosition, utf, 0, utf.length);
+		bufPosition += utf.length;
+		return new String(utf, 0, len, charsetUTF8);
 	}
 
 	/**
@@ -968,9 +1118,10 @@ public class Packer {
 	 * @see #getHexStringLower()
 	 */
 	public String getHexStringUpper() {
-		int len = decodeVInt(buf);
+		int len = getVInt();
 		byte[] hex = new byte[len];
-		buf.get(hex);
+		System.arraycopy(buf, bufPosition, hex, 0, hex.length);
+		bufPosition += hex.length;
 		return toHex(hex, true);
 	}
 
@@ -983,9 +1134,9 @@ public class Packer {
 	 * @see #putStringCollection(Collection)
 	 */
 	public Collection<String> getStringCollection(final Collection<String> collection) {
-		final int len = decodeVInt(buf);
+		final int len = getVInt();
 		for (int i = 0; i < len; i++) {
-			collection.add(decodeString(buf));
+			collection.add(getString());
 		}
 		return collection;
 	}
@@ -1004,9 +1155,9 @@ public class Packer {
 	public Collection<String> getStringCollection(final Class<? extends Collection> clazz) {
 		try {
 			final Collection<String> collection = clazz.newInstance();
-			final int len = decodeVInt(buf);
+			final int len = getVInt();
 			for (int i = 0; i < len; i++) {
-				collection.add(decodeString(buf));
+				collection.add(getString());
 			}
 			return collection;
 		} catch (InstantiationException e) {
@@ -1025,9 +1176,9 @@ public class Packer {
 	 * @see #putStringMap(Map)
 	 */
 	public Map<String, String> getStringMap(final Map<String, String> map) {
-		final int len = decodeVInt(buf);
+		final int len = getVInt();
 		for (int i = 0; i < len; i++) {
-			map.put(decodeString(buf), decodeString(buf));
+			map.put(getString(), getString());
 		}
 		return map;
 	}
@@ -1046,9 +1197,9 @@ public class Packer {
 	public Map<String, String> getStringMap(final Class<? extends Map> clazz) {
 		try {
 			final Map<String, String> map = clazz.newInstance();
-			final int len = decodeVInt(buf);
+			final int len = getVInt();
 			for (int i = 0; i < len; i++) {
-				map.put(decodeString(buf), decodeString(buf));
+				map.put(getString(), getString());
 			}
 			return map;
 		} catch (InstantiationException e) {
@@ -1066,9 +1217,10 @@ public class Packer {
 	 * @see #getHexStringUpper()
 	 */
 	public String getHexStringLower() {
-		int len = decodeVInt(buf);
+		int len = getVInt();
 		byte[] hex = new byte[len];
-		buf.get(hex);
+		System.arraycopy(buf, bufPosition, hex, 0, hex.length);
+		bufPosition += hex.length;
 		return toHex(hex, false);
 	}
 
@@ -1084,8 +1236,7 @@ public class Packer {
 	 * @see #outputStringBase64()
 	 */
 	public Packer loadStringBase64(final String in) throws InvalidInputDataException {
-		final byte[] tmpBuf = Base64.decode(in.getBytes(charsetISOLatin1));
-		return loadBytes(tmpBuf);
+		return loadBytes(Base64.decode(in.getBytes(charsetISOLatin1)));
 	}
 
 	/**
@@ -1099,8 +1250,7 @@ public class Packer {
 	 * @see Packer#outputStringBase64URLSafe()
 	 */
 	public Packer loadStringBase64URLSafe(final String in) throws InvalidInputDataException {
-		final byte[] tmpBuf = Base64.decode(in.getBytes(charsetISOLatin1));
-		return loadBytes(tmpBuf);
+		return loadBytes(Base64.decode(in.getBytes(charsetISOLatin1)));
 	}
 
 	/**
@@ -1113,8 +1263,7 @@ public class Packer {
 	 */
 	public Packer loadStringHex(final String in) throws InvalidInputDataException {
 		try {
-			byte[] tmpBuf = fromHex(in);
-			return loadBytes(tmpBuf);
+			return loadBytes(fromHex(in));
 		} catch (ParseException e) {
 			throw new IllegalArgumentException("Invalid input string", e);
 		}
@@ -1128,8 +1277,7 @@ public class Packer {
 	 * @see #outputStringRAW()
 	 */
 	public Packer loadStringRAW(final String in) throws InvalidInputDataException {
-		final byte[] tmpBuf = in.getBytes(charsetISOLatin1);
-		return loadBytes(tmpBuf);
+		return loadBytes(in.getBytes(charsetISOLatin1));
 	}
 
 	/**
@@ -1243,10 +1391,10 @@ public class Packer {
 			}
 			inlen = in.length;
 		}
-		buf.clear();
-		buf.put(in, 0, inlen);
-		buf.flip();
-		buf.rewind();
+		ensureCapacity(inlen);
+		System.arraycopy(in, 0, buf, 0, inlen);
+		bufPosition = inlen;
+		flip();
 		return this;
 	}
 
@@ -1468,120 +1616,6 @@ public class Packer {
 	}
 
 	/**
-	 * Write String into buffer in UTF-8 format (encoded as: VInt-Length + bytes)
-	 * 
-	 * @param buf
-	 * @param value
-	 */
-	static final void encodeString(final ByteBuffer out, final String value) {
-		final byte[] utf = value.getBytes(charsetUTF8);
-		encodeVInt(out, utf.length);
-		out.put(utf);
-	}
-
-	/**
-	 * Write String into buffer in UTF-8 format (encoded as: Int32-Length + bytes)
-	 * 
-	 * @param buf
-	 * @param value
-	 */
-	static final void encodeStringF(final ByteBuffer out, final String value) {
-		final byte[] utf = value.getBytes(charsetUTF8);
-		out.putInt(utf.length);
-		out.put(utf);
-	}
-
-	/**
-	 * Read String from buffer stored in UTF-8 format (encoded as: VInt-Length + bytes)
-	 * 
-	 * @param buf
-	 * @return
-	 */
-	static final String decodeString(final ByteBuffer in) {
-		int len = decodeVInt(in);
-		byte[] utf = new byte[len];
-		in.get(utf);
-		return new String(utf, 0, len, charsetUTF8);
-	}
-
-	/**
-	 * Read String from buffer stored in UTF-8 format (encoded as: Int32-Length + bytes)
-	 * 
-	 * @param buf
-	 * @return
-	 */
-	static final String decodeStringF(final ByteBuffer in) {
-		int len = in.getInt();
-		byte[] utf = new byte[len];
-		in.get(utf);
-		return new String(utf, 0, len, charsetUTF8);
-	}
-
-	/**
-	 * Write native int into buffer in variable length format
-	 * 
-	 * @param out
-	 * @param value
-	 */
-	static final void encodeVInt(final ByteBuffer out, int value) {
-		int i = 0;
-		while (((value & ~0x7FL) != 0L) && ((i += 7) < 32)) {
-			out.put((byte) ((value & 0x7FL) | 0x80L));
-			value >>>= 7;
-		}
-		out.put((byte) value);
-	}
-
-	/**
-	 * Write native long into buffer in variable length format
-	 * 
-	 * @param out
-	 * @param value
-	 */
-	static final void encodeVLong(final ByteBuffer out, long value) {
-		// org.apache.lucene.util.packed.AbstractBlockPackedWriter
-		int i = 0;
-		while (((value & ~0x7FL) != 0L) && ((i += 7) < 64)) {
-			out.put((byte) ((value & 0x7FL) | 0x80L));
-			value >>>= 7;
-		}
-		out.put((byte) value);
-	}
-
-	/**
-	 * Read native int from buffer in variable length format
-	 * 
-	 * @param in
-	 */
-	static final int decodeVInt(final ByteBuffer in) {
-		int value = 0;
-		for (int i = 0; i <= 32; i += 7) {
-			final byte b = in.get();
-			value |= ((b & 0x7FL) << i);
-			if (b >= 0)
-				return value;
-		}
-		return value;
-	}
-
-	/**
-	 * Read native long from buffer in variable length format
-	 * 
-	 * @param in
-	 */
-	static final long decodeVLong(final ByteBuffer in) {
-		// org.apache.lucene.util.packed.BlockPackedReaderIterator
-		long value = 0;
-		for (int i = 0; i <= 64; i += 7) {
-			final byte b = in.get();
-			value |= ((b & 0x7FL) << i);
-			if (b >= 0)
-				return value;
-		}
-		return value;
-	}
-
-	/**
 	 * Deflate input buffer
 	 * 
 	 * @param in
@@ -1640,5 +1674,32 @@ public class Packer {
 
 	static enum AESTYPEIV {
 		FAKE_IV, SHARED_IV, RANDOM_IV, RANDOM_INT_IV
+	}
+
+	public static enum AutoExtendPolicy {
+		/**
+		 * No auto extend (default)
+		 */
+		NONE,
+		/**
+		 * Resize minimal
+		 */
+		MINIMAL,
+		/**
+		 * Resize with heuristic mode / automatic rounding
+		 */
+		AUTO,
+		/**
+		 * Resize is rounded to 8 bytes boundary
+		 */
+		ROUND8,
+		/**
+		 * Resize is rounded to 512 bytes boundary
+		 */
+		ROUND512,
+		/**
+		 * Resize is rounded to 4096 bytes boundary
+		 */
+		ROUND4096
 	}
 }

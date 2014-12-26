@@ -2,7 +2,7 @@
 
 Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Java project under Apache License v2.0
 
-### Current Stable Version is [1.0.0](https://search.maven.org/#search|ga|1|g%3Aorg.javastack%20a%3Apacker)
+### Current Stable Version is [1.1.0](https://search.maven.org/#search|ga|1|g%3Aorg.javastack%20a%3Apacker)
 
 ---
 
@@ -32,6 +32,7 @@ Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Jav
 - CRC-8 ([CRC-8 poly 0xD5](https://en.wikipedia.org/wiki/Cyclic_redundancy_check))
 - Hash ([MessageDigest](http://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#MessageDigest)) 
 - HMAC ([Mac](http://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#Mac))
+- Buffer AutoExtend
 
 #### Usage Example
 
@@ -41,9 +42,10 @@ import org.javastack.packer.Packer;
 public class Example {
 	public static void main(final String[] args) {
 		// Sample usage (output):
-		Packer p = new Packer();
-		p.useCompress(true);               // Enable Compression
-		p.useCRC(true);                    // Enable CRC
+		Packer p = new Packer(16);
+		p.setAutoExtendPolicy(AutoExtendPolicy.AUTO);	// Enable AutoExtend
+		p.useCompress(true);               				// Enable Compression
+		p.useCRC(true);                    				// Enable CRC
 		String s1 = "hello", s2 = "world";
 		String hs = "df0c290eae2b";
 		byte b = 42;
@@ -59,9 +61,10 @@ public class Example {
 		System.out.println(out.length() + "\t" + out);
 
 		// Sample usage (load):
-		p = new Packer();
-		p.useCompress(true);               // Enable Compression
-		p.useCRC(true);                    // Enable CRC
+		p = new Packer(16);
+		p.setAutoExtendPolicy(AutoExtendPolicy.AUTO);	// Enable AutoExtend
+		p.useCompress(true);               				// Enable Compression
+		p.useCRC(true);                    				// Enable CRC
 		p.loadStringBase64URLSafe(out);
 		System.out.println(p.getString());
 		System.out.println(p.getString());
@@ -84,7 +87,7 @@ Add the dependency to your pom.xml:
     <dependency>
         <groupId>org.javastack</groupId>
         <artifactId>packer</artifactId>
-        <version>1.0.0</version>
+        <version>1.1.0</version>
     </dependency>
 
 ---
@@ -93,11 +96,6 @@ Add the dependency to your pom.xml:
 ## Benchmarks
 
 ###### TODO
-
-
-## TODOs
-
-- Buffer Auto-Expansion
 
 
 ---
