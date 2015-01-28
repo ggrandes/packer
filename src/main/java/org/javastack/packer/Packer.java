@@ -151,7 +151,7 @@ public class Packer {
 	 * @see java.nio.ByteBuffer
 	 */
 	public Packer(final int size) {
-		buf = new byte[Math.min(1, size)];
+		buf = new byte[Math.max(1, size)];
 		bufLimit = buf.length;
 	}
 
