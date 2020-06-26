@@ -52,7 +52,7 @@ import javax.crypto.spec.SecretKeySpec;
  * 
  * Sample usage (output):
  * 
- * <code><blockquote><pre>
+ * <pre>
  * Packer p = new Packer(16);
  * p.useCompress(false);
  * p.setAutoExtendPolicy(AutoExtendPolicy.AUTO);
@@ -70,11 +70,11 @@ import javax.crypto.spec.SecretKeySpec;
  * p.flip();
  * String out = p.outputStringBase64URLSafe();
  * System.out.println(out.length() + "\t" + out);
- * </pre></blockquote></code>
+ * </pre>
  * 
  * Sample usage (load):
  * 
- * <code><blockquote><pre>
+ * <pre>
  * p = new Packer(16);
  * p.setAutoExtendPolicy(AutoExtendPolicy.AUTO);
  * p.useCompress(false);
@@ -86,7 +86,7 @@ import javax.crypto.spec.SecretKeySpec;
  * System.out.println(p.getByte());
  * System.out.println(p.getVLong());
  * System.out.println(p.getVNegInt());
- * </pre></blockquote></code>
+ * </pre>
  * 
  * @see java.nio.ByteBuffer
  * @author Guillermo Grandes / guillermo.grandes[at]gmail.com
@@ -161,7 +161,7 @@ public class Packer {
 	/**
 	 * Create Packer with specified size
 	 * 
-	 * @param size
+	 * @param size for initial buffer
 	 * @see java.nio.ByteBuffer
 	 */
 	public Packer(final int size) {
@@ -172,8 +172,8 @@ public class Packer {
 	/**
 	 * Set Auto Extend Policy for Buffer
 	 * 
-	 * @param autoExtendPolicy
-	 * @return
+	 * @param autoExtendPolicy used to expand
+	 * @return this
 	 */
 	public Packer setAutoExtendPolicy(final AutoExtendPolicy autoExtendPolicy) {
 		this.autoExtendPolicy = autoExtendPolicy;
@@ -183,8 +183,8 @@ public class Packer {
 	/**
 	 * Ensure capacity
 	 * 
-	 * @param minCapacity
-	 * @return
+	 * @param minCapacity you want
+	 * @return this
 	 */
 	public Packer ensureCapacity(int minCapacity) {
 		if (minCapacity <= buf.length)
@@ -217,7 +217,7 @@ public class Packer {
 	/**
 	 * Clear Packer Buffer see: {@link java.nio.ByteBuffer#clear()}
 	 * 
-	 * @return
+	 * @return this
 	 */
 	public Packer clear() {
 		this.bufPosition = 0;
@@ -228,7 +228,7 @@ public class Packer {
 	/**
 	 * Flip Packer Buffer see: {@link java.nio.ByteBuffer#flip()}
 	 * 
-	 * @return
+	 * @return this
 	 */
 	public Packer flip() {
 		bufLimit = bufPosition;
@@ -239,7 +239,7 @@ public class Packer {
 	/**
 	 * Rewind Packer Buffer see: {@link java.nio.ByteBuffer#rewind()}
 	 * 
-	 * @return
+	 * @return this
 	 */
 	public Packer rewind() {
 		bufPosition = 0;
@@ -249,8 +249,8 @@ public class Packer {
 	/**
 	 * Sets the usage of Footer Flag (default true)
 	 * 
-	 * @param useFlagFooter
-	 * @return
+	 * @param useFlagFooter for variable features
+	 * @return this
 	 */
 	public Packer useFlagFooter(final boolean useFlagFooter) {
 		this.useFlagFooter = useFlagFooter;
@@ -260,8 +260,8 @@ public class Packer {
 	/**
 	 * Sets the usage of Deflater/Inflater (default false)
 	 * 
-	 * @param useCompress
-	 * @return
+	 * @param useCompress to reduce size
+	 * @return this
 	 */
 	public Packer useCompress(final boolean useCompress) {
 		this.useCompress = useCompress;
@@ -271,8 +271,8 @@ public class Packer {
 	/**
 	 * Sets the usage of CRC for sanity (default false)
 	 * 
-	 * @param useCRC
-	 * @return
+	 * @param useCRC to enable CRC
+	 * @return this
 	 */
 	public Packer useCRC(final boolean useCRC) {
 		this.useCRC = useCRC;
@@ -283,11 +283,11 @@ public class Packer {
 	 * Sets the usage of HASH for sanity (default no)
 	 * 
 	 * @param hashAlg
-	 *            hash algogithm
-	 * @return
-	 * @throws NoSuchAlgorithmException
+	 *            hash algorithm
+	 * @return this
+	 * @throws NoSuchAlgorithmException if hash algorithm not found
 	 * 
-	 * @see {@link java.security.MessageDigest#getInstance(String)}
+	 * @see java.security.MessageDigest#getInstance(String)
 	 */
 	public Packer useHASH(final String hashAlg) throws NoSuchAlgorithmException {
 		mdHash = MessageDigest.getInstance(hashAlg);
@@ -301,12 +301,12 @@ public class Packer {
 	 *            HMAC algorithm (HmacSHA1, HmacSHA256,...)
 	 * @param passphrase
 	 *            shared secret
-	 * @return
+	 * @return this
 	 * 
-	 * @throws NoSuchAlgorithmException
-	 * @throws InvalidKeyException
+	 * @throws NoSuchAlgorithmException if hash algorithm not found
+	 * @throws InvalidKeyException if invalid key
 	 * 
-	 * @see {@link javax.crypto.Mac#getInstance(String)}
+	 * @see javax.crypto.Mac#getInstance(String)
 	 * @see <a
 	 *      href="http://docs.oracle.com/javase/6/docs/technotes/guides/security/SunProviders.html#SunJCEProvider">JCE
 	 *      Provider</a>
@@ -322,10 +322,10 @@ public class Packer {
 	 * Sets he usage of "AES/GCM/NoPadding" with random-IV for encryption (default no)
 	 * 
 	 * @param passphrase shared secret
-	 * @return
-	 * @throws NoSuchAlgorithmException
-	 * @throws NoSuchPaddingException
-	 * @throws InvalidKeySpecException 
+	 * @return this
+	 * @throws NoSuchAlgorithmException if algorithm not found
+	 * @throws NoSuchPaddingException if padding not found
+	 * @throws InvalidKeySpecException if invalid key 
 	 */
 	public Packer useAESGCM(final String passphrase) throws NoSuchAlgorithmException,
 			NoSuchPaddingException, InvalidKeySpecException {
@@ -345,9 +345,9 @@ public class Packer {
 	 * Sets he usage of "AES/CBC/PKCS5Padding" (with default IV) for encryption (default no)
 	 * 
 	 * @param passphrase shared secret
-	 * @return
-	 * @throws NoSuchAlgorithmException
-	 * @throws NoSuchPaddingException
+	 * @return this
+	 * @throws NoSuchAlgorithmException if algorithm not found
+	 * @throws NoSuchPaddingException if padding not found
 	 */
 	public Packer useAES(final String passphrase) throws NoSuchAlgorithmException, NoSuchPaddingException {
 		return useAES(passphrase, false);
@@ -359,9 +359,9 @@ public class Packer {
 	 * @param passphrase shared secret
 	 * @param sharedIV shared Initialization Vector
 	 * 
-	 * @return
-	 * @throws NoSuchAlgorithmException
-	 * @throws NoSuchPaddingException
+	 * @return this
+	 * @throws NoSuchAlgorithmException if algorithm not found
+	 * @throws NoSuchPaddingException if padding not found
 	 */
 	public Packer useAES(final String passphrase, final String sharedIV) throws NoSuchAlgorithmException,
 			NoSuchPaddingException {
@@ -377,9 +377,9 @@ public class Packer {
 	 * 
 	 * @param passphrase shared secret
 	 * 
-	 * @return
-	 * @throws NoSuchAlgorithmException
-	 * @throws NoSuchPaddingException
+	 * @return this
+	 * @throws NoSuchAlgorithmException if algorithm not found
+	 * @throws NoSuchPaddingException if padding not found
 	 */
 	public Packer useAESwithRandomIntIV(final String passphrase) throws NoSuchAlgorithmException,
 			NoSuchPaddingException {
@@ -396,9 +396,9 @@ public class Packer {
 	 * @param passphrase shared secret
 	 * @param useRandomIV true for use randomIV (more secure, more size) or false for default IV (less secure,
 	 *            less size)
-	 * @return
-	 * @throws NoSuchAlgorithmException
-	 * @throws NoSuchPaddingException
+	 * @return this
+	 * @throws NoSuchAlgorithmException if algorithm not found
+	 * @throws NoSuchPaddingException if padding not found
 	 */
 	public Packer useAES(final String passphrase, final boolean useRandomIV) throws NoSuchAlgorithmException,
 			NoSuchPaddingException {
@@ -508,11 +508,11 @@ public class Packer {
 	/**
 	 * Sets he usage of "RSA/ECB/PKCS1Padding" for encryption (default no)
 	 * 
-	 * @param rsaKeyForEncrypt
-	 * @param rsaKeyForDecrypt
-	 * @return
-	 * @throws NoSuchPaddingException
-	 * @throws NoSuchAlgorithmException
+	 * @param rsaKeyForEncrypt key for encrypt
+	 * @param rsaKeyForDecrypt key for decrypt
+	 * @return this
+	 * @throws NoSuchPaddingException if padding not found
+	 * @throws NoSuchAlgorithmException if algorithm not found
 	 */
 	public Packer useRSA(final Key rsaKeyForEncrypt, final Key rsaKeyForDecrypt)
 			throws NoSuchAlgorithmException, NoSuchPaddingException {
@@ -526,8 +526,8 @@ public class Packer {
 	 * Generate RSA KeyPair
 	 * 
 	 * @param keyLen in bits (2048 recomended)
-	 * @return
-	 * @throws NoSuchAlgorithmException
+	 * @return keypair
+	 * @throws NoSuchAlgorithmException if algorithm not found
 	 */
 	public static KeyPair generateKeyPair(final int keyLen) throws NoSuchAlgorithmException {
 		final String name = ASYM_CIPHER_CHAIN_PADDING;
@@ -541,7 +541,7 @@ public class Packer {
 	/**
 	 * Return internal buffer as ByteBuffer
 	 * 
-	 * @return
+	 * @return byte buffer
 	 */
 	public ByteBuffer getByteBuffer() {
 		final ByteBuffer bb = ByteBuffer.wrap(buf);
@@ -555,8 +555,8 @@ public class Packer {
 	/**
 	 * Put native byte (fixed length)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value byte
+	 * @return this
 	 * @see #getByte()
 	 */
 	public Packer putByte(final byte value) {
@@ -568,8 +568,8 @@ public class Packer {
 	/**
 	 * Put native char (fixed length)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value char
+	 * @return this
 	 * @see #getChar()
 	 */
 	public Packer putChar(final char value) {
@@ -582,8 +582,8 @@ public class Packer {
 	/**
 	 * Put native short (fixed length)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value short
+	 * @return this
 	 * @see #getShort()
 	 */
 	public Packer putShort(final short value) {
@@ -596,8 +596,8 @@ public class Packer {
 	/**
 	 * Put native double (fixed length)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value double
+	 * @return this
 	 * @see #getDouble()
 	 */
 	public Packer putDouble(final double value) {
@@ -608,8 +608,8 @@ public class Packer {
 	/**
 	 * Put native float (fixed length)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value float
+	 * @return this
 	 * @see #getFloat()
 	 */
 	public Packer putFloat(final float value) {
@@ -620,8 +620,8 @@ public class Packer {
 	/**
 	 * Put native int (fixed length)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value int
+	 * @return this
 	 * @see #getInt()
 	 */
 	public Packer putInt(final int value) {
@@ -636,8 +636,8 @@ public class Packer {
 	/**
 	 * Put native long (fixed length)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value long
+	 * @return this
 	 * @see #getLong()
 	 */
 	public Packer putLong(final long value) {
@@ -656,8 +656,8 @@ public class Packer {
 	/**
 	 * Put native int in variable length format (support negative value, but size is longer)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value int
+	 * @return this
 	 * @see #getVInt()
 	 */
 	public Packer putVInt(int value) {
@@ -674,8 +674,8 @@ public class Packer {
 	/**
 	 * Put native negative int in variable length format (support positive value, but size is longer)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value int
+	 * @return this
 	 * @see #getVNegInt()
 	 */
 	public Packer putVNegInt(final int value) {
@@ -686,8 +686,8 @@ public class Packer {
 	/**
 	 * Put native long in variable length format (support negative value, but size is longer)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value long
+	 * @return this
 	 * @see #getVLong()
 	 */
 	public Packer putVLong(long value) {
@@ -705,8 +705,8 @@ public class Packer {
 	/**
 	 * Put native negative long in variable length format (support positive value, but size is longer)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value long
+	 * @return this
 	 * @see #getVNegLong()
 	 */
 	public Packer putVNegLong(final long value) {
@@ -717,8 +717,8 @@ public class Packer {
 	/**
 	 * Put Byte array (encoded as: VInt-Length + bytes)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value byte array
+	 * @return this
 	 * @see #getBytes()
 	 */
 	public Packer putBytes(final byte[] value) {
@@ -732,8 +732,8 @@ public class Packer {
 	/**
 	 * Put Byte array (encoded as: Int32-Length + bytes)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value byte array
+	 * @return this
 	 * @see #getBytes()
 	 */
 	public Packer putBytesF(final byte[] value) {
@@ -747,8 +747,8 @@ public class Packer {
 	/**
 	 * Put String in UTF-8 format (encoded as: VInt-Length + bytes)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value string
+	 * @return this
 	 * @see #getString()
 	 */
 	public Packer putString(final String value) {
@@ -759,8 +759,8 @@ public class Packer {
 	/**
 	 * Put String in UTF-8 format (encoded as: Int32-Length + bytes)
 	 * 
-	 * @param value
-	 * @return
+	 * @param value string
+	 * @return this
 	 * @see #getString()
 	 */
 	public Packer putStringF(final String value) {
@@ -771,9 +771,9 @@ public class Packer {
 	/**
 	 * Put Hex String ("0123456789ABCDEF")
 	 * 
-	 * @param value
-	 * @return
-	 * @throws IllegalArgumentException
+	 * @param value hex string
+	 * @return this
+	 * @throws IllegalArgumentException if value is invalid
 	 * @see #getHexStringLower()
 	 * @see #getHexStringUpper()
 	 */
@@ -791,10 +791,10 @@ public class Packer {
 	}
 
 	/**
-	 * Put a Collection<String> in UTF-8 format
+	 * Put a Collection&lt;String&gt; in UTF-8 format
 	 * 
-	 * @param collection
-	 * @return
+	 * @param collection of values
+	 * @return this
 	 * @see #getStringCollection(Collection)
 	 */
 	public Packer putStringCollection(final Collection<String> collection) {
@@ -806,10 +806,10 @@ public class Packer {
 	}
 
 	/**
-	 * Put a Map<String, String> in UTF-8 format
+	 * Put a Map&lt;String, String&gt; in UTF-8 format
 	 * 
-	 * @param value
-	 * @return
+	 * @param map values
+	 * @return this
 	 * @see #getStringMap(Map)
 	 */
 	public Packer putStringMap(final Map<String, String> map) {
@@ -830,6 +830,7 @@ public class Packer {
 	 * <p>
 	 * Base64 info: <a href="http://en.wikipedia.org/wiki/Base64">Base64</a>
 	 * 
+	 * @return base64 string
 	 * @see #loadStringBase64(String)
 	 */
 	public String outputStringBase64() {
@@ -842,6 +843,7 @@ public class Packer {
 	 * RFC-4648 info, The "URL and Filename safe" Base 64 Alphabet: <a
 	 * href="http://tools.ietf.org/html/rfc4648#page-7">RFC-4648</a>
 	 * 
+	 * @return base64 string URLSafe
 	 * @see #loadStringBase64URLSafe(String)
 	 */
 	public String outputStringBase64URLSafe() {
@@ -851,7 +853,7 @@ public class Packer {
 	/**
 	 * Output string in hex format
 	 * 
-	 * @return
+	 * @return hex string
 	 * @see #loadStringHex(String)
 	 */
 	public String outputStringHex() {
@@ -861,7 +863,7 @@ public class Packer {
 	/**
 	 * Output string in raw format (ISO-8859-1)
 	 * 
-	 * @return
+	 * @return raw string
 	 * @see #loadStringRAW(String)
 	 */
 	public String outputStringRAW() {
@@ -871,8 +873,7 @@ public class Packer {
 	/**
 	 * Output bytes in raw format
 	 * 
-	 * @return
-	 * @throws IllegalArgumentException
+	 * @return byte array
 	 * 
 	 * @see #loadBytes(byte[])
 	 * @see #useCompress(boolean)
@@ -961,7 +962,7 @@ public class Packer {
 	/**
 	 * Get native byte (fixed length)
 	 * 
-	 * @return
+	 * @return byte
 	 * @see #putByte(byte)
 	 */
 	public byte getByte() {
@@ -971,7 +972,7 @@ public class Packer {
 	/**
 	 * Get native char (fixed length)
 	 * 
-	 * @return
+	 * @return char
 	 * @see #putChar(char)
 	 */
 	public char getChar() {
@@ -981,7 +982,7 @@ public class Packer {
 	/**
 	 * Get native short (fixed length)
 	 * 
-	 * @return
+	 * @return short
 	 * @see #putShort(short)
 	 */
 	public short getShort() {
@@ -991,7 +992,7 @@ public class Packer {
 	/**
 	 * Get native double (fixed length)
 	 * 
-	 * @return
+	 * @return doble
 	 * @see #putDouble(double)
 	 */
 	public double getDouble() {
@@ -1001,7 +1002,7 @@ public class Packer {
 	/**
 	 * Get native float (fixed length)
 	 * 
-	 * @return
+	 * @return float
 	 * @see #putFloat(float)
 	 */
 	public float getFloat() {
@@ -1011,7 +1012,7 @@ public class Packer {
 	/**
 	 * Get native int (fixed length)
 	 * 
-	 * @return
+	 * @return int
 	 * @see #putInt(int)
 	 */
 	public int getInt() {
@@ -1026,7 +1027,7 @@ public class Packer {
 	/**
 	 * Get native long (fixed length)
 	 * 
-	 * @return
+	 * @return long
 	 * @see #putLong(long)
 	 */
 	public long getLong() {
@@ -1045,7 +1046,7 @@ public class Packer {
 	/**
 	 * Get native int stored in variable length format (support positive value, but size is longer)
 	 * 
-	 * @return
+	 * @return int
 	 * @see #getVNegInt()
 	 */
 	public int getVInt() {
@@ -1062,7 +1063,7 @@ public class Packer {
 	/**
 	 * Get native negative int stored in variable length format (support positive value, but size is longer)
 	 * 
-	 * @return
+	 * @return int
 	 * @see #getVInt()
 	 */
 	public int getVNegInt() {
@@ -1072,7 +1073,7 @@ public class Packer {
 	/**
 	 * Get native long stored in variable length format (support positive value, but size is longer)
 	 * 
-	 * @return
+	 * @return long
 	 * @see #getVNegLong()
 	 */
 	public long getVLong() {
@@ -1090,7 +1091,7 @@ public class Packer {
 	/**
 	 * Get native negative long stored in variable length format (support positive value, but size is longer)
 	 * 
-	 * @return
+	 * @return long
 	 * @see #getVLong()
 	 */
 	public long getVNegLong() {
@@ -1100,7 +1101,7 @@ public class Packer {
 	/**
 	 * Get Byte array (encoded as: VInt-Length + bytes)
 	 * 
-	 * @return
+	 * @return byte array
 	 * @see #putBytes(byte[])
 	 */
 	public byte[] getBytes() {
@@ -1114,7 +1115,7 @@ public class Packer {
 	/**
 	 * Get Byte array (encoded as: Int32-Length + bytes)
 	 * 
-	 * @return
+	 * @return byte array
 	 * @see #putBytes(byte[])
 	 */
 	public byte[] getBytesF() {
@@ -1128,7 +1129,7 @@ public class Packer {
 	/**
 	 * Get String stored in UTF-8 format (encoded as: VInt-Length + bytes)
 	 * 
-	 * @return
+	 * @return string
 	 * @see #putString(String)
 	 */
 	public String getString() {
@@ -1142,7 +1143,7 @@ public class Packer {
 	/**
 	 * Get String stored in UTF-8 format (encoded as: Int32-Length + bytes)
 	 * 
-	 * @return
+	 * @return string
 	 * @see #putString(String)
 	 */
 	public String getStringF() {
@@ -1156,7 +1157,7 @@ public class Packer {
 	/**
 	 * Get Hex String in upper case ("0123456789ABCDEF")
 	 * 
-	 * @return
+	 * @return hex string
 	 * @see #putHexString(String)
 	 * @see #getHexStringLower()
 	 */
@@ -1169,11 +1170,11 @@ public class Packer {
 	}
 
 	/**
-	 * Get Collection<String> stored in UTF-8 format
+	 * Get Collection&lt;String&gt; stored in UTF-8 format
 	 * 
 	 * @param collection
 	 *            to put stored elements
-	 * @return
+	 * @return collection of strings
 	 * @see #putStringCollection(Collection)
 	 */
 	public Collection<String> getStringCollection(final Collection<String> collection) {
@@ -1185,11 +1186,11 @@ public class Packer {
 	}
 
 	/**
-	 * Get Collection<String> stored in UTF-8 format
+	 * Get Collection&lt;String&gt; stored in UTF-8 format
 	 * 
 	 * @param clazz
 	 *            to instantiate
-	 * @return
+	 * @return collection of strings
 	 * @see #putStringCollection(Collection)
 	 */
 	@SuppressWarnings({
@@ -1211,11 +1212,11 @@ public class Packer {
 	}
 
 	/**
-	 * Get Map<String, String> stored in UTF-8 format
+	 * Get Map&lt;String, String&gt; stored in UTF-8 format
 	 * 
 	 * @param map
 	 *            to put stored elements
-	 * @return
+	 * @return map of strings
 	 * @see #putStringMap(Map)
 	 */
 	public Map<String, String> getStringMap(final Map<String, String> map) {
@@ -1227,11 +1228,11 @@ public class Packer {
 	}
 
 	/**
-	 * Get Map<String, String> stored in UTF-8 format
+	 * Get Map&lt;String, String&gt; stored in UTF-8 format
 	 * 
 	 * @param clazz
 	 *            to instantiate
-	 * @return
+	 * @return map of strings
 	 * @see #putStringMap(Map)
 	 */
 	@SuppressWarnings({
@@ -1255,7 +1256,7 @@ public class Packer {
 	/**
 	 * Get Hex String in lower case ("0123456789abcdef")
 	 * 
-	 * @return
+	 * @return hex string
 	 * @see #putHexString(String)
 	 * @see #getHexStringUpper()
 	 */
@@ -1273,8 +1274,10 @@ public class Packer {
 	 * Load Base64 string
 	 * <p>
 	 * Base64 info: <a href="http://en.wikipedia.org/wiki/Base64">Base64</a>
-	 * 
-	 * @throws InvalidInputDataException
+	 *
+	 * @param in input string
+	 * @return this
+	 * @throws InvalidInputDataException if invalid data
 	 * 
 	 * @see #outputStringBase64()
 	 */
@@ -1288,7 +1291,9 @@ public class Packer {
 	 * RFC-4648 info, The "URL and Filename safe" Base 64 Alphabet: <a
 	 * href="http://tools.ietf.org/html/rfc4648#page-7">RFC-4648</a>
 	 * 
-	 * @throws InvalidInputDataException
+	 * @param in input string
+	 * @return this
+	 * @throws InvalidInputDataException if invalid data
 	 * 
 	 * @see Packer#outputStringBase64URLSafe()
 	 */
@@ -1299,9 +1304,9 @@ public class Packer {
 	/**
 	 * Load string in hex format
 	 * 
-	 * @return
-	 * @throws InvalidInputDataException
-	 * @throws ParseException
+	 * @param in input string
+	 * @return this
+	 * @throws InvalidInputDataException if invalid data
 	 * @see #outputStringHex()
 	 */
 	public Packer loadStringHex(final String in) throws InvalidInputDataException {
@@ -1315,8 +1320,9 @@ public class Packer {
 	/**
 	 * Load string in raw format (ISO-8859-1)
 	 * 
-	 * @return
-	 * @throws InvalidInputDataException
+	 * @param in input string
+	 * @return this
+	 * @throws InvalidInputDataException if invalid data
 	 * @see #outputStringRAW()
 	 */
 	public Packer loadStringRAW(final String in) throws InvalidInputDataException {
@@ -1326,8 +1332,9 @@ public class Packer {
 	/**
 	 * Load bytes[] in raw format (ISO-8859-1)
 	 * 
-	 * @return
-	 * @throws InvalidInputDataException
+	 * @param in input buffer
+	 * @return this
+	 * @throws InvalidInputDataException if invalid data
 	 * @see #outputBytes()
 	 */
 	public Packer loadBytes(byte[] in) throws InvalidInputDataException {
@@ -1453,7 +1460,7 @@ public class Packer {
 	 * @param input
 	 * @param offset
 	 * @param len
-	 * @return
+	 * @return crc
 	 */
 	static final int crc8(final byte[] input, final int offset, final int len) {
 		final int poly = 0x0D5;
@@ -1481,7 +1488,7 @@ public class Packer {
 	 * @param input
 	 * @param offset
 	 * @param len
-	 * @return
+	 * @return hash
 	 */
 	final byte[] hash(final byte[] input, final int offset, final int len) {
 		mdHash.update(input, offset, len);
@@ -1496,7 +1503,7 @@ public class Packer {
 	 * @param input
 	 * @param offset
 	 * @param len
-	 * @return
+	 * @return hmac
 	 */
 	final byte[] hmac(final byte[] input, final int offset, final int len) {
 		hMac.update(input, offset, len);
@@ -1510,7 +1517,7 @@ public class Packer {
 	 * @param offset
 	 * @param len
 	 * @param decrypt
-	 * @return
+	 * @return byte array
 	 * @throws InvalidAlgorithmParameterException
 	 * @throws InvalidKeyException
 	 * @throws BadPaddingException
@@ -1552,7 +1559,7 @@ public class Packer {
 	 * 
 	 * @param buf
 	 * @param newsize
-	 * @return
+	 * @return buf
 	 */
 	static final byte[] resizeBuffer(final byte[] buf, final int newsize) {
 		if (buf.length == newsize)
@@ -1589,7 +1596,7 @@ public class Packer {
 	 * 
 	 * @param flags
 	 * @param flag
-	 * @return
+	 * @return boolean
 	 */
 	static final boolean checkFlag(final int flags, final int flag) {
 		return ((flags & flag) != 0);
@@ -1599,7 +1606,7 @@ public class Packer {
 	 * Transform byte array to Hex String
 	 * 
 	 * @param input
-	 * @return
+	 * @return hex string
 	 */
 	static final String toHex(final byte[] input, final int len, final boolean upper) {
 		final char[] hex = new char[len << 1];
@@ -1626,7 +1633,7 @@ public class Packer {
 	 * 
 	 * @param input
 	 * @param upper
-	 * @return
+	 * @return hex string
 	 */
 	static final String toHex(final byte[] input, final boolean upper) {
 		return toHex(input, input.length, upper);
@@ -1636,7 +1643,7 @@ public class Packer {
 	 * Transform Hex String to byte array
 	 * 
 	 * @param hex
-	 * @return
+	 * @return byte array
 	 * @throws ParseException
 	 */
 	static final byte[] fromHex(final String hex) throws ParseException {
@@ -1668,7 +1675,7 @@ public class Packer {
 	 * 
 	 * @param in
 	 * @param len
-	 * @return
+	 * @return byte array
 	 */
 	static final byte[] deflate(final byte[] in, final int len) {
 		byte[] defBuf = new byte[len << 1];
@@ -1686,7 +1693,7 @@ public class Packer {
 	 * Inflate input buffer
 	 * 
 	 * @param in
-	 * @return
+	 * @return byte array
 	 * @throws DataFormatException
 	 */
 	static final byte[] inflate(final byte[] in, final int offset, final int length)
