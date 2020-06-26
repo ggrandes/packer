@@ -24,6 +24,8 @@ import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.InvalidKeySpecException;
 import java.text.ParseException;
 import java.util.Collection;
 import java.util.Map;
@@ -37,6 +39,7 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
@@ -100,6 +103,16 @@ public class Packer {
 	public static final int FLAG_RSA = 0x40;
 	public static final int FLAG_RANDOM_INT_IV = 0x80;
 
+    // AES-GCM parameters
+	// Recommendation for Block Cipher Modes of Operation: Galois/Counter Mode (GCM)
+	// NIST. 800-38D: https://csrc.nist.gov/publications/detail/sp/800-38d/final
+	// For IVs, it is recommended that implementations restrict support to the
+	// length of 96 bits, to promote interoperability, efficiency, and simplicity of
+	// design.
+    static final int GCM_IV_LENGTH = 96 / 8; // in bytes;
+    static final int GCM_TAG_LENGTH = 128 / 8; // in bytes
+	static final String CIPHER_GCM = "AES/GCM/NoPadding";
+
 	static final String CIPHER_CHAIN_PADDING = "AES/CBC/PKCS5Padding";
 	static final String ASYM_CIPHER_CHAIN_PADDING = "RSA/ECB/PKCS1Padding";
 	static final String CIPHER = "AES";
@@ -118,7 +131,8 @@ public class Packer {
 			.getBytes(charsetISOLatin1); // Default shared IV
 	AESTYPEIV aesTypeIV = AESTYPEIV.FAKE_IV; // 0=No IV
 	int integerIV = Integer.MIN_VALUE;
-	IvParameterSpec aesIV = null;
+	byte[] aesIV = null;
+	AESTYPE aesType = AESTYPE.NONE;
 	Cipher aesCipher = null;
 	int aesCipherLen = -1;
 	SecretKeySpec aesKey = null;
@@ -305,6 +319,29 @@ public class Packer {
 	}
 
 	/**
+	 * Sets he usage of "AES/GCM/NoPadding" with random-IV for encryption (default no)
+	 * 
+	 * @param passphrase shared secret
+	 * @return
+	 * @throws NoSuchAlgorithmException
+	 * @throws NoSuchPaddingException
+	 * @throws InvalidKeySpecException 
+	 */
+	public Packer useAESGCM(final String passphrase) throws NoSuchAlgorithmException,
+			NoSuchPaddingException, InvalidKeySpecException {
+		initCipherGCM();
+		initCipherIV(generateRandomIV(GCM_IV_LENGTH), AESTYPEIV.RANDOM_IV);
+		initCipherKey(passphrase);
+		return this;
+	}
+
+	private final void initCipherGCM() throws NoSuchAlgorithmException, NoSuchPaddingException {
+		this.aesType = AESTYPE.GCM;
+		this.aesCipher = Cipher.getInstance(CIPHER_GCM);
+		this.aesCipherLen = aesCipher.getBlockSize();
+	}
+
+	/**
 	 * Sets he usage of "AES/CBC/PKCS5Padding" (with default IV) for encryption (default no)
 	 * 
 	 * @param passphrase shared secret
@@ -328,7 +365,7 @@ public class Packer {
 	 */
 	public Packer useAES(final String passphrase, final String sharedIV) throws NoSuchAlgorithmException,
 			NoSuchPaddingException {
-		initCipher();
+		initCipherCBC();
 		initCipherIV(generateMdfromString(sharedIV, aesCipherLen), AESTYPEIV.SHARED_IV);
 		initCipherKey(passphrase);
 		return this;
@@ -346,7 +383,7 @@ public class Packer {
 	 */
 	public Packer useAESwithRandomIntIV(final String passphrase) throws NoSuchAlgorithmException,
 			NoSuchPaddingException {
-		initCipher();
+		initCipherCBC();
 		integerIV = (rnd.nextInt() & 0x7FFFFFFF);
 		initCipherIV(generateMdfromInteger(this.integerIV, aesCipherLen), AESTYPEIV.RANDOM_INT_IV);
 		initCipherKey(passphrase);
@@ -365,21 +402,25 @@ public class Packer {
 	 */
 	public Packer useAES(final String passphrase, final boolean useRandomIV) throws NoSuchAlgorithmException,
 			NoSuchPaddingException {
-		initCipher();
+		initCipherCBC();
 		initCipherIV((useRandomIV ? generateRandomIV(aesCipherLen) : getDefaultIV(aesCipherLen)),
 				(useRandomIV ? AESTYPEIV.RANDOM_IV : AESTYPEIV.FAKE_IV));
 		initCipherKey(passphrase);
 		return this;
 	}
 
-	private final void initCipher() throws NoSuchAlgorithmException, NoSuchPaddingException {
-		aesCipher = Cipher.getInstance(CIPHER_CHAIN_PADDING);
-		aesCipherLen = aesCipher.getBlockSize();
+	private final void initCipherCBC() throws NoSuchAlgorithmException, NoSuchPaddingException {
+		this.aesType = AESTYPE.CBC;
+		this.aesCipher = Cipher.getInstance(CIPHER_CHAIN_PADDING);
+		this.aesCipherLen = aesCipher.getBlockSize();
 	}
 
 	private final void initCipherIV(final byte[] iv, final AESTYPEIV aesTypeIV) {
 		this.aesTypeIV = aesTypeIV;
-		this.aesIV = new IvParameterSpec(resizeBuffer(iv, aesCipherLen));
+		final int ivLen = ((aesType == AESTYPE.GCM) //
+				? GCM_IV_LENGTH //
+				: aesCipherLen);
+		this.aesIV = resizeBuffer(iv, ivLen);
 	}
 
 	private final void initCipherKey(final String passphrase) throws NoSuchAlgorithmException {
@@ -860,7 +901,7 @@ public class Packer {
 				switch (aesTypeIV) {
 					case RANDOM_IV: { // useAES + randomIV
 						flags |= FLAG_RANDOM_IV;
-						final byte[] ivBuf = aesIV.getIV();
+						final byte[] ivBuf = aesIV;
 						tmpBuf = resizeBuffer(tmpBuf, len + ivBuf.length);
 						System.arraycopy(ivBuf, 0, tmpBuf, len, ivBuf.length);
 						len = tmpBuf.length;
@@ -1360,7 +1401,9 @@ public class Packer {
 			if (aesKey == null)
 				throw new InvalidInputDataException("Invalid Flags (Crypto) or AES crypto not initialized");
 			if (checkFlag(flags, FLAG_RANDOM_IV)) {
-				final int ivLen = aesCipherLen;
+				final int ivLen = ((aesType == AESTYPE.GCM) //
+						? GCM_IV_LENGTH //
+						: aesCipherLen);
 				final byte[] ivBuf = new byte[ivLen];
 				System.arraycopy(in, inlen - ivLen, ivBuf, 0, ivLen);
 				initCipherIV(ivBuf, AESTYPEIV.RANDOM_IV);
@@ -1476,7 +1519,10 @@ public class Packer {
 	final byte[] crypto(final byte[] input, final int offset, final int len, final boolean decrypt)
 			throws InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException,
 			BadPaddingException {
-		aesCipher.init(decrypt ? Cipher.DECRYPT_MODE : Cipher.ENCRYPT_MODE, aesKey, aesIV);
+		final AlgorithmParameterSpec spec = ((aesType == AESTYPE.GCM) //
+				? new GCMParameterSpec(GCM_TAG_LENGTH * 8, aesIV) //
+				: new IvParameterSpec(aesIV));
+		aesCipher.init(decrypt ? Cipher.DECRYPT_MODE : Cipher.ENCRYPT_MODE, aesKey, spec);
 		return aesCipher.doFinal(input, offset, len);
 	}
 
@@ -1676,6 +1722,10 @@ public class Packer {
 
 	static enum AESTYPEIV {
 		FAKE_IV, SHARED_IV, RANDOM_IV, RANDOM_INT_IV
+	}
+
+	static enum AESTYPE {
+		NONE, CBC, GCM
 	}
 
 	public static enum AutoExtendPolicy {

@@ -75,5 +75,23 @@ public class Example {
 		System.out.println(dbl + "\t" + p.getDouble());
 		System.out.println(sc1 + "\t" + p.getStringCollection(sc2));
 		System.out.println(sm1 + "\t" + p.getStringMap(LinkedHashMap.class));
+
+		System.out.println("--- Sample 3");
+		// Sample usage (Output AESGCM):
+		p = new Packer(8);
+		p.setAutoExtendPolicy(AutoExtendPolicy.AUTO);	// Enable AutoExtend
+		p.useAESGCM("secret");                  		// Enable Encryption (AES-GCM)
+		//
+		p.putString(s1).putString(s2);
+		p.flip();
+		out = p.outputStringBase64URLSafe();
+		System.out.println("output:\t" + out + "\t" + "len:" + out.length());
+		// Sample usage (load AESGCM):
+		p = new Packer(8);
+		p.setAutoExtendPolicy(AutoExtendPolicy.AUTO);	// Enable AutoExtend
+		p.useAESGCM("secret");                  		// Enable Encryption (AES-GCM)
+		p.loadStringBase64URLSafe(out);
+		System.out.println(s1 + "\t" + p.getString());
+		System.out.println(s2 + "\t" + p.getString());
 	}
 }

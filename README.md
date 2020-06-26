@@ -23,16 +23,19 @@ Simple Data Packer for Java (like Kryo,... but very simplified). Open Source Jav
 #### Features
 
 - Compression (Deflate)
-- Encryption (AES/CBC/PKCS5Padding)
+- Encryption (AES/GCM/NoPadding; randomIV) `java 8+` `note-1`
+- Encryption (AES/CBC/PKCS5Padding) `note-1`
   - Default IV
   - Shared IV
   - Random IV
   - Random Integer IV (compact IV)
-- Encryption (RSA/ECB/PKCS1Padding)
+- Encryption (RSA/ECB/PKCS1Padding) `note-1`
 - CRC-8 ([CRC-8 poly 0xD5](https://en.wikipedia.org/wiki/Cyclic_redundancy_check))
 - Hash ([MessageDigest](http://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#MessageDigest)) 
 - HMAC ([Mac](http://docs.oracle.com/javase/7/docs/technotes/guides/security/StandardNames.html#Mac))
 - Buffer AutoExtend
+
+###### `note-1`: It is encouraged not to reuse instances of the Packer object when using encryption (IV are initialized only once).
 
 #### Usage Example
 
