@@ -95,9 +95,9 @@ public class Base64 {
 	/**
 	 * Encode to Base64
 	 * 
-	 * @param input
-	 * @param urlSafeEncoding
-	 * @return
+	 * @param input byte array
+	 * @param urlSafeEncoding true for URLSafe encoding
+	 * @return encoded array
 	 */
 	public static byte[] encode(final byte[] input, final boolean urlSafeEncoding) {
 		final int lenInput = input.length;
@@ -127,9 +127,9 @@ public class Base64 {
 	/**
 	 * Encode to Base64
 	 * 
-	 * @param input
-	 * @param urlSafeEncoding
-	 * @return
+	 * @param input string
+	 * @param urlSafeEncoding true for URLSafe encoding
+	 * @return encoded string
 	 */
 	public static String encode(final String input, final boolean urlSafeEncoding) {
 		return new String(encode(input.getBytes(charsetUTF8), urlSafeEncoding), charsetISOLatin1);
@@ -138,8 +138,8 @@ public class Base64 {
 	/**
 	 * Decode from Base64
 	 * 
-	 * @param input
-	 * @return
+	 * @param input byte array
+	 * @return descoded byte array
 	 */
 	public static byte[] decode(final byte[] input) {
 		final int lenInput = findEnd(input);
@@ -165,8 +165,8 @@ public class Base64 {
 	/**
 	 * Decode from Base64
 	 * 
-	 * @param input
-	 * @return
+	 * @param input string
+	 * @return decoded string
 	 */
 	public static String decode(final String input) {
 		return new String(decode(input.getBytes(charsetISOLatin1)), charsetUTF8);
@@ -179,9 +179,6 @@ public class Base64 {
 		return j + 1;
 	}
 
-	/**
-	 * Simple Test
-	 */
 	public static void main(final String[] args) throws Throwable {
 		final String strTest1 = "test";
 		final String strTest2 = "hello world!!";
